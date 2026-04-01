@@ -12,7 +12,10 @@
 
     <nav class="top-nav">
         <div class="nav-brand"><i class="fas fa-microscope"></i> LabManager</div>
-        <button id="install-app-btn" style="display: none;" class="btn secondary-btn" style="padding: 5px 10px; font-size: 0.8rem;"><i class="fas fa-download"></i> Install App</button>
+        <div class="nav-actions">
+            <button id="debug-btn" class="icon-btn" title="Open Console"><i class="fas fa-bug"></i></button>
+            <button id="install-app-btn" style="display: none;" class="btn secondary-btn install-btn"><i class="fas fa-download"></i></button>
+        </div>
     </nav>
 
     <div id="login-screen" class="screen active">
@@ -51,9 +54,9 @@
     <div id="dashboard-screen" class="screen">
         <header class="dashboard-header card">
             <div class="user-profile">
-                <img id="display-pic" src="https://via.placeholder.com/50" alt="Profile" class="profile-pic">
+                <img id="display-pic" src="https://ui-avatars.com/api/?name=User&background=2563eb&color=fff" alt="Profile" class="profile-pic">
                 <div class="user-details">
-                    <h3 id="display-name">User Name</h3>
+                    <h3 id="display-name">Loading...</h3>
                     <span id="display-lab" class="badge">Lab</span>
                 </div>
             </div>
@@ -66,11 +69,15 @@
         <div class="dashboard-grid">
             <div class="task-column card">
                 <h3><i class="fas fa-inbox"></i> Open Lab Tasks</h3>
-                <div id="open-tasks-list" class="task-list"></div>
+                <div id="open-tasks-list" class="task-list">
+                    <p class="text-muted">Loading tasks...</p>
+                </div>
             </div>
             <div class="task-column card">
                 <h3><i class="fas fa-tasks"></i> My Accepted Tasks</h3>
-                <div id="my-tasks-list" class="task-list"></div>
+                <div id="my-tasks-list" class="task-list">
+                    <p class="text-muted">Loading tasks...</p>
+                </div>
             </div>
         </div>
 
@@ -104,12 +111,15 @@
         </div>
     </div>
 
-    <div id="debug-panel" class="debug-panel hidden">
-        <div class="debug-header">
-            <span>🛠 Debug Console</span>
-            <button id="toggle-debug" style="background:none; border:none; color:white; font-size:1.2rem;">⬇</button>
+    <div id="debug-modal" class="modal">
+        <div class="modal-content card" style="background: #111; color: #0f0; border: 1px solid #333;">
+            <div style="display:flex; justify-content:space-between; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 10px;">
+                <h3 style="margin:0;"><i class="fas fa-terminal"></i> Console</h3>
+                <button id="close-debug-btn" class="icon-btn" style="color: #fff;"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="debug-log" style="height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; word-wrap: break-word;"></div>
+            <button id="clear-debug-btn" class="btn secondary-btn" style="width: 100%; margin-top: 10px; background: #333; color: white;">Clear Log</button>
         </div>
-        <div id="debug-log" class="debug-log"></div>
     </div>
 
     <script type="module" src="app.js"></script>
