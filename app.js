@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc, serverTimestamp, orderBy, where } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyC3QMu8G5Q-1Fi8AoB2i3NtlusqjRbFVGg",
@@ -18,6 +18,19 @@ const db = getFirestore(app);
 let currentUserDoc = null;
 let previousTasksState = new Map(); 
 
+// === PWA APP INSTALL LOGIC ===
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+}
+let deferredPrompt;
+const installBtn = document.getElementById('install-app-btn');
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'inline-flex';
+});
+installBtn.addEventListener('click', async () => {
+    if (deferredPrompt) { deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; if (outcome === 'accepted') installBtn.style.display = 'none'; deferredPrompt = null; }
+});
+
 // === UI & ALARMS ===
 const flashOverlay = document.getElementById('flash-overlay');
 const alarmAudio = document.getElementById('task-alarm');
@@ -25,30 +38,32 @@ let isRinging = false;
 
 function showToast(message, icon = "fa-bell") {
     const container = document.getElementById('toast-container');
-    const toast = document.createElement('div');
-    toast.className = 'toast';
+    const toast = document.createElement('div'); toast.className = 'toast';
     toast.innerHTML = `<i class="fas ${icon}" style="color: #10b981;"></i> <span>${message}</span>`;
     container.appendChild(toast);
     setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 4000);
 }
 
 document.getElementById('enable-alerts-btn').addEventListener('click', async () => {
-    try {
-        await Notification.requestPermission();
-        showToast("Notifications enabled!", "fa-check-circle");
-        alarmAudio.play().then(() => { alarmAudio.pause(); alarmAudio.currentTime = 0; }).catch(e=>{});
-    } catch(e) { }
+    try { await Notification.requestPermission(); showToast("Alerts enabled!", "fa-check-circle"); alarmAudio.play().then(() => { alarmAudio.pause(); alarmAudio.currentTime = 0; }).catch(e=>{}); } catch(e) { }
 });
 
 const screens = { login: document.getElementById('login-screen'), profile: document.getElementById('profile-screen'), dashboard: document.getElementById('dashboard-screen') };
 function showScreen(screenName) { Object.values(screens).forEach(s => s.classList.remove('active')); screens[screenName].classList.add('active'); }
 
+// Debugger
+const debugLog = document.getElementById('debug-log');
+function logToScreen(msg) { if(debugLog) { debugLog.innerHTML += `<div>> ${msg}</div>`; debugLog.scrollTop = debugLog.scrollHeight; } }
+console.log = (...args) => { logToScreen(args.join(' ')); };
+document.getElementById('debug-btn').addEventListener('click', () => document.getElementById('debug-modal').style.display = 'flex');
+document.getElementById('close-debug-btn').addEventListener('click', () => document.getElementById('debug-modal').style.display = 'none');
+document.getElementById('clear-debug-btn').addEventListener('click', () => debugLog.innerHTML = '');
+
 // === AUTHENTICATION ===
 document.getElementById('login-google-btn').addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()));
 window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { 'size': 'normal' });
 document.getElementById('send-otp-btn').addEventListener('click', () => {
-    signInWithPhoneNumber(auth, document.getElementById('phone-number').value, window.recaptchaVerifier)
-        .then((res) => { window.confirmationResult = res; document.getElementById('otp-section').style.display = 'block'; document.getElementById('send-otp-btn').style.display = 'none'; });
+    signInWithPhoneNumber(auth, document.getElementById('phone-number').value, window.recaptchaVerifier).then((res) => { window.confirmationResult = res; document.getElementById('otp-section').style.display = 'block'; document.getElementById('send-otp-btn').style.display = 'none'; });
 });
 document.getElementById('verify-otp-btn').addEventListener('click', () => window.confirmationResult.confirm(document.getElementById('otp-code').value));
 
@@ -68,40 +83,64 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 document.getElementById('save-profile-btn').addEventListener('click', async () => {
-    const user = auth.currentUser;
-    const name = document.getElementById('prof-name').value;
+    const user = auth.currentUser; const name = document.getElementById('prof-name').value;
     const profileData = {
-        uid: user.uid, name: name, 
-        email: user.email || document.getElementById('prof-email').value,
-        phone: user.phoneNumber || document.getElementById('prof-phone').value,
-        lab: document.getElementById('prof-lab').value, status: "Active", 
+        uid: user.uid, name: name, email: user.email || document.getElementById('prof-email').value,
+        phone: user.phoneNumber || document.getElementById('prof-phone').value, lab: document.getElementById('prof-lab').value, status: "Active", 
         photoURL: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'U')}&background=2563eb&color=fff`
     };
     await setDoc(doc(db, "users", user.uid), profileData);
-    currentUserDoc = profileData;
-    setupDashboard(user, profileData);
-    showScreen('dashboard');
+    currentUserDoc = profileData; setupDashboard(user, profileData); showScreen('dashboard');
 });
 
-// === GLOBAL CHAT & NOTICES ===
+// === 1-ON-1 DIRECT MESSAGING LOGIC ===
+let currentChatUserId = null;
+let chatUnsubscribe = null;
+
+function getChatId(uid1, uid2) {
+    return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
+}
+
 const chatPanel = document.getElementById('chat-panel');
-document.getElementById('fab-chat').addEventListener('click', () => chatPanel.classList.remove('hidden'));
+const contactListArea = document.getElementById('chat-contact-list');
+const conversationArea = document.getElementById('chat-conversation-area');
+const chatTitle = document.getElementById('chat-panel-title');
+const backBtn = document.getElementById('chat-back-btn');
+
+document.getElementById('fab-chat').addEventListener('click', () => {
+    chatPanel.classList.remove('hidden');
+    showContactList();
+});
 document.getElementById('close-chat-btn').addEventListener('click', () => chatPanel.classList.add('hidden'));
 
-document.getElementById('send-chat-btn').addEventListener('click', async () => {
-    const input = document.getElementById('chat-input');
-    if(!input.value) return;
-    await addDoc(collection(db, "chats"), {
-        text: input.value, senderId: auth.currentUser.uid,
-        senderName: currentUserDoc.name, timestamp: serverTimestamp()
-    });
-    input.value = '';
-});
+// Return to contact list
+backBtn.addEventListener('click', () => showContactList());
 
-function listenToChat() {
+function showContactList() {
+    currentChatUserId = null;
+    if(chatUnsubscribe) { chatUnsubscribe(); chatUnsubscribe = null; }
+    
+    backBtn.classList.add('hidden');
+    chatTitle.innerHTML = `<i class="fas fa-address-book"></i> Contacts`;
+    conversationArea.classList.add('hidden');
+    contactListArea.classList.remove('hidden');
+}
+
+function openDirectChat(targetUser) {
+    currentChatUserId = targetUser.uid;
+    
+    backBtn.classList.remove('hidden');
+    chatTitle.textContent = targetUser.name;
+    contactListArea.classList.add('hidden');
+    conversationArea.classList.remove('hidden');
+
+    const chatId = getChatId(auth.currentUser.uid, targetUser.uid);
     const chatMessages = document.getElementById('chat-messages');
-    const q = query(collection(db, "chats"), orderBy("timestamp", "asc"));
-    onSnapshot(q, (snapshot) => {
+
+    if(chatUnsubscribe) chatUnsubscribe(); // Stop old listener
+
+    const q = query(collection(db, "direct_messages"), where("chatId", "==", chatId), orderBy("timestamp", "asc"));
+    chatUnsubscribe = onSnapshot(q, (snapshot) => {
         chatMessages.innerHTML = '';
         snapshot.forEach(doc => {
             const msg = doc.data();
@@ -110,7 +149,6 @@ function listenToChat() {
             
             chatMessages.innerHTML += `
                 <div class="chat-msg ${isMine ? 'msg-mine' : 'msg-theirs'}">
-                    <span class="sender">${isMine ? 'You' : msg.senderName}</span>
                     ${msg.text}
                     <span class="time">${timeString}</span>
                 </div>
@@ -119,6 +157,20 @@ function listenToChat() {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     });
 }
+
+document.getElementById('send-chat-btn').addEventListener('click', async () => {
+    const input = document.getElementById('chat-input');
+    if(!input.value || !currentChatUserId) return;
+    
+    const chatId = getChatId(auth.currentUser.uid, currentChatUserId);
+    await addDoc(collection(db, "direct_messages"), {
+        chatId: chatId,
+        text: input.value, 
+        senderId: auth.currentUser.uid,
+        timestamp: serverTimestamp()
+    });
+    input.value = '';
+});
 
 // === DASHBOARD & TASKS ===
 function setupDashboard(user, profile) {
@@ -130,24 +182,46 @@ function setupDashboard(user, profile) {
     document.getElementById('user-status').value = profile.status || "Active";
     document.getElementById('user-status').addEventListener('change', async (e) => await updateDoc(doc(db, "users", user.uid), { status: e.target.value }));
 
-    listenToChat(); // Start Chat Listener
+    // Listen to Users (For Directory & Chat)
+    onSnapshot(collection(db, "users"), (snapshot) => {
+        const assigneeSelect = document.getElementById('task-assignee');
+        assigneeSelect.innerHTML = '<option value="All">App Flash Only (Broadcast)</option><option value="WhatsApp">Forward to WhatsApp</option>';
+        
+        contactListArea.innerHTML = ''; // Clear chat directory
+
+        snapshot.forEach(userDoc => {
+            const u = userDoc.data();
+            if(u.uid !== user.uid) {
+                // Populate Assignee Dropdown
+                assigneeSelect.innerHTML += `<option value="${u.uid}">${u.name} (${u.lab})</option>`;
+                
+                // Populate Chat Contact List
+                const contactEl = document.createElement('div');
+                contactEl.className = 'contact-item';
+                contactEl.innerHTML = `
+                    <img src="${u.photoURL}" onerror="this.src='https://ui-avatars.com/api/?name=${u.name[0]}&background=2563eb&color=fff'">
+                    <div>
+                        <span class="name">${u.name}</span>
+                        <span class="lab">${u.lab} Lab - ${u.status === 'Active' ? '🟢' : '🔴'}</span>
+                    </div>
+                `;
+                contactEl.onclick = () => openDirectChat(u);
+                contactListArea.appendChild(contactEl);
+            }
+        });
+    });
 
     onSnapshot(collection(db, "tasks"), (snapshot) => {
-        const openList = document.getElementById('open-tasks-list');
-        const myList = document.getElementById('my-tasks-list');
+        const openList = document.getElementById('open-tasks-list'); const myList = document.getElementById('my-tasks-list');
         openList.innerHTML = ''; myList.innerHTML = '';
 
         let unassignedTaskCount = 0; let myAcceptedCount = 0;
         let statCreated = 0; let statHelpedByOthers = 0; let statMyAccepted = 0;
 
         snapshot.forEach(taskDoc => {
-            const task = taskDoc.data();
-            const taskId = taskDoc.id;
+            const task = taskDoc.data(); const taskId = taskDoc.id;
 
-            if(task.createdBy === user.uid) {
-                statCreated++;
-                if(task.status !== "Pending") statHelpedByOthers++;
-            }
+            if(task.createdBy === user.uid) { statCreated++; if(task.status !== "Pending") statHelpedByOthers++; }
             if(task.acceptedById === user.uid) statMyAccepted++;
 
             const prevTask = previousTasksState.get(taskId);
@@ -158,31 +232,27 @@ function setupDashboard(user, profile) {
 
             if ((task.targetLab !== "Both") && (profile.lab !== "Both") && (task.targetLab !== profile.lab)) return;
 
-            const taskEl = document.createElement('div');
-            taskEl.className = 'task-item';
+            const taskEl = document.createElement('div'); taskEl.className = 'task-item';
             taskEl.innerHTML = `<h4>${task.title}</h4><p><i class="fas fa-info-circle"></i> ${task.details}</p><p><i class="far fa-clock"></i> Time: ${task.timeNeeded} | Mgr: ${task.manager}</p>`;
 
-            if (task.status === "Pending" && (task.assignedTo === "All" || task.assignedTo === "WhatsApp")) {
+            if (task.status === "Pending" && (task.assignedTo === "All" || task.assignedTo === "WhatsApp" || task.assignedTo === user.uid)) {
                 unassignedTaskCount++;
                 const acceptBtn = document.createElement('button');
-                acceptBtn.className = 'task-btn'; acceptBtn.style.background = '#f59e0b'; acceptBtn.style.color = 'white';
+                acceptBtn.className = 'task-btn'; acceptBtn.style.background = 'rgba(245, 158, 11, 0.2)'; acceptBtn.style.color = '#fbbf24';
                 acceptBtn.innerHTML = '<i class="fas fa-hand-paper"></i> Accept Task';
                 acceptBtn.onclick = async () => {
                     const time = prompt("Expected completion time?");
                     if(time) await updateDoc(taskDoc.ref, { status: "Accepted", acceptedBy: profile.name, acceptedById: user.uid, expectedTime: time });
                 };
-                taskEl.appendChild(acceptBtn);
-                openList.appendChild(taskEl);
+                taskEl.appendChild(acceptBtn); openList.appendChild(taskEl);
             } else if (task.acceptedById === user.uid) {
                 if (task.status !== "Done") {
                     const doneBtn = document.createElement('button');
-                    doneBtn.className = 'task-btn done';
-                    doneBtn.innerHTML = '<i class="fas fa-check"></i> Mark as Done';
+                    doneBtn.className = 'task-btn done'; doneBtn.innerHTML = '<i class="fas fa-check"></i> Mark as Done';
                     doneBtn.onclick = async () => await updateDoc(taskDoc.ref, { status: "Done" });
                     taskEl.appendChild(doneBtn);
                 }
-                myList.appendChild(taskEl);
-                myAcceptedCount++;
+                myList.appendChild(taskEl); myAcceptedCount++;
             }
         });
 
@@ -201,16 +271,14 @@ function setupDashboard(user, profile) {
     });
 }
 
-// === TASK CREATION & WHATSAPP INTEGRATION ===
+// === TASK CREATION ===
 const taskModal = document.getElementById('task-modal');
 document.getElementById('fab-add-task').addEventListener('click', () => taskModal.style.display = 'flex');
 document.getElementById('close-modal-btn').addEventListener('click', () => taskModal.style.display = 'none');
 
 document.getElementById('submit-task-btn').addEventListener('click', async () => {
-    const title = document.getElementById('task-title').value;
-    const details = document.getElementById('task-details').value;
-    const timeNeeded = document.getElementById('task-time').value;
-    const manager = document.getElementById('task-manager').value;
+    const title = document.getElementById('task-title').value; const details = document.getElementById('task-details').value;
+    const timeNeeded = document.getElementById('task-time').value; const manager = document.getElementById('task-manager').value;
     const alertMethod = document.getElementById('task-assignee').value;
 
     if(!title) { alert("Title is required!"); return; }
@@ -225,10 +293,8 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
     document.getElementById('task-title').value = ''; document.getElementById('task-details').value = '';
     showToast("Task Published!", "fa-check");
 
-    // WHATSAPP FORWARDING LOGIC
     if (alertMethod === "WhatsApp") {
         const waText = `🚨 *NEW LAB TASK: ${title}* 🚨\n\n📌 *Details:* ${details}\n⏰ *Time:* ${timeNeeded}\n👨‍💼 *Manager:* ${manager}\n\n👉 Open the LabManager App to accept!`;
-        const waLink = `https://wa.me/?text=${encodeURIComponent(waText)}`;
-        window.open(waLink, '_blank'); // Opens WhatsApp with pre-filled text
+        window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank');
     }
 });
