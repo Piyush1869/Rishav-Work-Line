@@ -7,12 +7,12 @@
   "theme_color": "#3b82f6",
   "icons": [
     {
-      "src": "https://via.placeholder.com/192.png?text=Lab",
+      "src": "/icon.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://via.placeholder.com/512.png?text=Lab",
+      "src": "/icon.png",
       "sizes": "512x512",
       "type": "image/png"
     }
