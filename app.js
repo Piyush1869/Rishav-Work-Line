@@ -18,23 +18,22 @@ const db = getFirestore(app);
 let currentUserDoc = null;
 let previousTasksState = new Map(); 
 
-// === PWA APP INSTALL LOGIC ===
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{}));
-}
-let deferredPrompt;
-const installBtn = document.getElementById('install-app-btn');
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'inline-flex';
-});
-installBtn.addEventListener('click', async () => {
-    if (deferredPrompt) { deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; if (outcome === 'accepted') installBtn.style.display = 'none'; deferredPrompt = null; }
-});
+// PWA Install
+if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
+let deferredPrompt; const installBtn = document.getElementById('install-app-btn');
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'inline-flex'; });
+installBtn.addEventListener('click', async () => { if (deferredPrompt) { deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; if (outcome === 'accepted') installBtn.style.display = 'none'; deferredPrompt = null; } });
 
-// === UI & ALARMS ===
+// === UI & ALARMS (Now with Blue Glow) ===
 const flashOverlay = document.getElementById('flash-overlay');
 const alarmAudio = document.getElementById('task-alarm');
+const alertBtn = document.getElementById('enable-alerts-btn');
 let isRinging = false;
+
+// Check if already granted on load, apply glow
+if (Notification.permission === 'granted') {
+    alertBtn.classList.add('glow-blue');
+}
 
 function showToast(message, icon = "fa-bell") {
     const container = document.getElementById('toast-container');
@@ -44,8 +43,19 @@ function showToast(message, icon = "fa-bell") {
     setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 4000);
 }
 
-document.getElementById('enable-alerts-btn').addEventListener('click', async () => {
-    try { await Notification.requestPermission(); showToast("Alerts enabled!", "fa-check-circle"); alarmAudio.play().then(() => { alarmAudio.pause(); alarmAudio.currentTime = 0; }).catch(e=>{}); } catch(e) { }
+alertBtn.addEventListener('click', async () => {
+    if(Notification.permission === 'granted') {
+        showToast("Alerts already active!", "fa-check-circle");
+        return;
+    }
+    try { 
+        const perm = await Notification.requestPermission();
+        if(perm === 'granted') {
+            alertBtn.classList.add('glow-blue');
+            showToast("Alerts enabled!", "fa-check-circle"); 
+            alarmAudio.play().then(() => { alarmAudio.pause(); alarmAudio.currentTime = 0; }).catch(e=>{}); 
+        }
+    } catch(e) { }
 });
 
 const screens = { login: document.getElementById('login-screen'), profile: document.getElementById('profile-screen'), dashboard: document.getElementById('dashboard-screen') };
@@ -82,24 +92,38 @@ onAuthStateChanged(auth, async (user) => {
     } else { showScreen('login'); }
 });
 
+// === PROFILE SAVE & EDIT ===
 document.getElementById('save-profile-btn').addEventListener('click', async () => {
     const user = auth.currentUser; const name = document.getElementById('prof-name').value;
     const profileData = {
-        uid: user.uid, name: name, email: user.email || document.getElementById('prof-email').value,
-        phone: user.phoneNumber || document.getElementById('prof-phone').value, lab: document.getElementById('prof-lab').value, status: "Active", 
+        uid: user.uid, name: name, 
+        email: document.getElementById('prof-email').value || user.email,
+        phone: document.getElementById('prof-phone').value || user.phoneNumber, 
+        lab: document.getElementById('prof-lab').value, status: "Active", 
         photoURL: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'U')}&background=2563eb&color=fff`
     };
     await setDoc(doc(db, "users", user.uid), profileData);
     currentUserDoc = profileData; setupDashboard(user, profileData); showScreen('dashboard');
+    showToast("Profile Updated!", "fa-user-check");
 });
 
-// === 1-ON-1 DIRECT MESSAGING LOGIC ===
-let currentChatUserId = null;
-let chatUnsubscribe = null;
+document.getElementById('edit-profile-btn').addEventListener('click', () => {
+    if (currentUserDoc) {
+        document.getElementById('prof-name').value = currentUserDoc.name || '';
+        document.getElementById('prof-email').value = currentUserDoc.email || '';
+        document.getElementById('prof-phone').value = currentUserDoc.phone || '';
+        document.getElementById('prof-lab').value = currentUserDoc.lab || 'PVL';
+        
+        // Ensure both inputs are visible so user can fill them manually
+        document.getElementById('prof-email').style.display = 'block';
+        document.getElementById('prof-phone').style.display = 'block';
+        showScreen('profile');
+    }
+});
 
-function getChatId(uid1, uid2) {
-    return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
-}
+// === 1-ON-1 DIRECT MESSAGING ===
+let currentChatUserId = null; let chatUnsubscribe = null;
+function getChatId(uid1, uid2) { return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`; }
 
 const chatPanel = document.getElementById('chat-panel');
 const contactListArea = document.getElementById('chat-contact-list');
@@ -107,52 +131,31 @@ const conversationArea = document.getElementById('chat-conversation-area');
 const chatTitle = document.getElementById('chat-panel-title');
 const backBtn = document.getElementById('chat-back-btn');
 
-document.getElementById('fab-chat').addEventListener('click', () => {
-    chatPanel.classList.remove('hidden');
-    showContactList();
-});
+document.getElementById('fab-chat').addEventListener('click', () => { chatPanel.classList.remove('hidden'); showContactList(); });
 document.getElementById('close-chat-btn').addEventListener('click', () => chatPanel.classList.add('hidden'));
-
-// Return to contact list
 backBtn.addEventListener('click', () => showContactList());
 
 function showContactList() {
-    currentChatUserId = null;
-    if(chatUnsubscribe) { chatUnsubscribe(); chatUnsubscribe = null; }
-    
-    backBtn.classList.add('hidden');
-    chatTitle.innerHTML = `<i class="fas fa-address-book"></i> Contacts`;
-    conversationArea.classList.add('hidden');
-    contactListArea.classList.remove('hidden');
+    currentChatUserId = null; if(chatUnsubscribe) { chatUnsubscribe(); chatUnsubscribe = null; }
+    backBtn.classList.add('hidden'); chatTitle.innerHTML = `<i class="fas fa-address-book"></i> Contacts`;
+    conversationArea.classList.add('hidden'); contactListArea.classList.remove('hidden');
 }
 
 function openDirectChat(targetUser) {
-    currentChatUserId = targetUser.uid;
-    
-    backBtn.classList.remove('hidden');
-    chatTitle.textContent = targetUser.name;
-    contactListArea.classList.add('hidden');
-    conversationArea.classList.remove('hidden');
+    currentChatUserId = targetUser.uid; backBtn.classList.remove('hidden');
+    chatTitle.textContent = targetUser.name; contactListArea.classList.add('hidden'); conversationArea.classList.remove('hidden');
 
     const chatId = getChatId(auth.currentUser.uid, targetUser.uid);
     const chatMessages = document.getElementById('chat-messages');
 
-    if(chatUnsubscribe) chatUnsubscribe(); // Stop old listener
-
+    if(chatUnsubscribe) chatUnsubscribe(); 
     const q = query(collection(db, "direct_messages"), where("chatId", "==", chatId), orderBy("timestamp", "asc"));
     chatUnsubscribe = onSnapshot(q, (snapshot) => {
         chatMessages.innerHTML = '';
         snapshot.forEach(doc => {
-            const msg = doc.data();
-            const isMine = msg.senderId === auth.currentUser.uid;
+            const msg = doc.data(); const isMine = msg.senderId === auth.currentUser.uid;
             const timeString = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Now';
-            
-            chatMessages.innerHTML += `
-                <div class="chat-msg ${isMine ? 'msg-mine' : 'msg-theirs'}">
-                    ${msg.text}
-                    <span class="time">${timeString}</span>
-                </div>
-            `;
+            chatMessages.innerHTML += `<div class="chat-msg ${isMine ? 'msg-mine' : 'msg-theirs'}">${msg.text}<span class="time">${timeString}</span></div>`;
         });
         chatMessages.scrollTop = chatMessages.scrollHeight;
     });
@@ -161,13 +164,9 @@ function openDirectChat(targetUser) {
 document.getElementById('send-chat-btn').addEventListener('click', async () => {
     const input = document.getElementById('chat-input');
     if(!input.value || !currentChatUserId) return;
-    
-    const chatId = getChatId(auth.currentUser.uid, currentChatUserId);
     await addDoc(collection(db, "direct_messages"), {
-        chatId: chatId,
-        text: input.value, 
-        senderId: auth.currentUser.uid,
-        timestamp: serverTimestamp()
+        chatId: getChatId(auth.currentUser.uid, currentChatUserId),
+        text: input.value, senderId: auth.currentUser.uid, timestamp: serverTimestamp()
     });
     input.value = '';
 });
@@ -175,36 +174,21 @@ document.getElementById('send-chat-btn').addEventListener('click', async () => {
 // === DASHBOARD & TASKS ===
 function setupDashboard(user, profile) {
     document.getElementById('display-name').textContent = profile.name;
-    document.getElementById('display-email').textContent = profile.email;
+    document.getElementById('display-email').textContent = profile.email || profile.phone;
     document.getElementById('display-lab').textContent = profile.lab;
     document.getElementById('display-pic').src = profile.photoURL;
 
     document.getElementById('user-status').value = profile.status || "Active";
     document.getElementById('user-status').addEventListener('change', async (e) => await updateDoc(doc(db, "users", user.uid), { status: e.target.value }));
 
-    // Listen to Users (For Directory & Chat)
+    // Listen to Users (For Directory)
     onSnapshot(collection(db, "users"), (snapshot) => {
-        const assigneeSelect = document.getElementById('task-assignee');
-        assigneeSelect.innerHTML = '<option value="All">App Flash Only (Broadcast)</option><option value="WhatsApp">Forward to WhatsApp</option>';
-        
-        contactListArea.innerHTML = ''; // Clear chat directory
-
+        contactListArea.innerHTML = ''; 
         snapshot.forEach(userDoc => {
             const u = userDoc.data();
             if(u.uid !== user.uid) {
-                // Populate Assignee Dropdown
-                assigneeSelect.innerHTML += `<option value="${u.uid}">${u.name} (${u.lab})</option>`;
-                
-                // Populate Chat Contact List
-                const contactEl = document.createElement('div');
-                contactEl.className = 'contact-item';
-                contactEl.innerHTML = `
-                    <img src="${u.photoURL}" onerror="this.src='https://ui-avatars.com/api/?name=${u.name[0]}&background=2563eb&color=fff'">
-                    <div>
-                        <span class="name">${u.name}</span>
-                        <span class="lab">${u.lab} Lab - ${u.status === 'Active' ? '🟢' : '🔴'}</span>
-                    </div>
-                `;
+                const contactEl = document.createElement('div'); contactEl.className = 'contact-item';
+                contactEl.innerHTML = `<img src="${u.photoURL}" onerror="this.src='https://ui-avatars.com/api/?name=${u.name[0]}&background=2563eb&color=fff'"><div><span class="name">${u.name}</span><span class="lab">${u.lab} Lab - ${u.status === 'Active' ? '🟢' : '🔴'}</span></div>`;
                 contactEl.onclick = () => openDirectChat(u);
                 contactListArea.appendChild(contactEl);
             }
@@ -235,8 +219,14 @@ function setupDashboard(user, profile) {
             const taskEl = document.createElement('div'); taskEl.className = 'task-item';
             taskEl.innerHTML = `<h4>${task.title}</h4><p><i class="fas fa-info-circle"></i> ${task.details}</p><p><i class="far fa-clock"></i> Time: ${task.timeNeeded} | Mgr: ${task.manager}</p>`;
 
-            if (task.status === "Pending" && (task.assignedTo === "All" || task.assignedTo === "WhatsApp" || task.assignedTo === user.uid)) {
-                unassignedTaskCount++;
+            // App Flash activates for "All" or "BothAlerts"
+            if (task.status === "Pending" && (task.assignedTo === "All" || task.assignedTo === "WhatsApp" || task.assignedTo === "BothAlerts" || task.assignedTo === user.uid)) {
+                
+                // Only count towards ringing if it's meant to flash the app (All or BothAlerts)
+                if (task.assignedTo === "All" || task.assignedTo === "BothAlerts") {
+                    unassignedTaskCount++;
+                }
+
                 const acceptBtn = document.createElement('button');
                 acceptBtn.className = 'task-btn'; acceptBtn.style.background = 'rgba(245, 158, 11, 0.2)'; acceptBtn.style.color = '#fbbf24';
                 acceptBtn.innerHTML = '<i class="fas fa-hand-paper"></i> Accept Task';
@@ -266,12 +256,12 @@ function setupDashboard(user, profile) {
             flashOverlay.style.display = 'none'; alarmAudio.pause(); alarmAudio.currentTime = 0; isRinging = false;
         }
 
-        if (unassignedTaskCount === 0) openList.innerHTML = '<p class="text-muted">No pending tasks right now.</p>';
+        if (openList.innerHTML === '') openList.innerHTML = '<p class="text-muted">No pending tasks right now.</p>';
         if (myAcceptedCount === 0) myList.innerHTML = '<p class="text-muted">You have no accepted tasks.</p>';
     });
 }
 
-// === TASK CREATION ===
+// === TASK CREATION (With Combined BothAlerts Option) ===
 const taskModal = document.getElementById('task-modal');
 document.getElementById('fab-add-task').addEventListener('click', () => taskModal.style.display = 'flex');
 document.getElementById('close-modal-btn').addEventListener('click', () => taskModal.style.display = 'none');
@@ -293,7 +283,8 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
     document.getElementById('task-title').value = ''; document.getElementById('task-details').value = '';
     showToast("Task Published!", "fa-check");
 
-    if (alertMethod === "WhatsApp") {
+    // WHATSAPP TRIGGER (Runs if WhatsApp Only OR BothAlerts is selected)
+    if (alertMethod === "WhatsApp" || alertMethod === "BothAlerts") {
         const waText = `🚨 *NEW LAB TASK: ${title}* 🚨\n\n📌 *Details:* ${details}\n⏰ *Time:* ${timeNeeded}\n👨‍💼 *Manager:* ${manager}\n\n👉 Open the LabManager App to accept!`;
         window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank');
     }
