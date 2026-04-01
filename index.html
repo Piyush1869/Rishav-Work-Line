@@ -2,61 +2,114 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Lab Task Manager</title>
+    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
+    <nav class="top-nav">
+        <div class="nav-brand"><i class="fas fa-microscope"></i> LabManager</div>
+        <button id="install-app-btn" style="display: none;" class="btn secondary-btn" style="padding: 5px 10px; font-size: 0.8rem;"><i class="fas fa-download"></i> Install App</button>
+    </nav>
+
     <div id="login-screen" class="screen active">
-        <h1>Lab Workflow Manager</h1>
-        
-        <div class="login-box">
-            <button id="login-google-btn">Login with Gmail</button>
-            <hr style="margin: 20px 0;">
-            
-            <h3>Or Login with Phone</h3>
-            <input type="tel" id="phone-number" placeholder="+919876543210" style="margin-bottom: 10px;">
-            <div id="recaptcha-container"></div>
-            <button id="send-otp-btn">Send OTP</button>
+        <div class="card login-card">
+            <h2>Welcome Back</h2>
+            <p>Sign in to manage your lab workflow</p>
+            <button id="login-google-btn" class="btn primary-btn"><i class="fab fa-google"></i> Login with Google</button>
+            <div class="divider"><span>OR</span></div>
+            <input type="tel" id="phone-number" placeholder="+91 98765 43210" class="input-field">
+            <div id="recaptcha-container" style="margin-top: 10px;"></div>
+            <button id="send-otp-btn" class="btn secondary-btn" style="width: 100%; margin-top: 10px;"><i class="fas fa-sms"></i> Send OTP</button>
 
             <div id="otp-section" style="display: none; margin-top: 15px;">
-                <input type="text" id="otp-code" placeholder="Enter 6-digit OTP">
-                <button id="verify-otp-btn">Verify OTP</button>
+                <input type="text" id="otp-code" placeholder="Enter 6-digit OTP" class="input-field">
+                <button id="verify-otp-btn" class="btn primary-btn" style="width: 100%; margin-top: 10px;">Verify OTP</button>
             </div>
         </div>
     </div>
 
     <div id="profile-screen" class="screen">
-        <h2>Complete Your Profile</h2>
-        <p id="profile-instruction">Please fill in your missing details.</p>
-        
-        <input type="text" id="prof-name" placeholder="Full Name">
-        
-        <input type="email" id="prof-email" placeholder="Gmail Address" style="display: none;">
-        <input type="tel" id="prof-phone" placeholder="Phone Number (+91...)" style="display: none;">
-        
-        <select id="prof-lab">
-            <option value="PVL">PVL Lab</option>
-            <option value="HET">HET Lab</option>
-            <option value="Both">Both Labs</option>
-        </select>
-        <button id="save-profile-btn">Save Profile</button>
+        <div class="card">
+            <h2>Complete Profile</h2>
+            <p id="profile-instruction" class="text-muted">Please fill in missing details</p>
+            <input type="text" id="prof-name" placeholder="Full Name" class="input-field">
+            <input type="email" id="prof-email" placeholder="Gmail Address" class="input-field" style="display: none;">
+            <input type="tel" id="prof-phone" placeholder="Phone Number (+91...)" class="input-field" style="display: none;">
+            <select id="prof-lab" class="input-field">
+                <option value="PVL">PVL Lab</option>
+                <option value="HET">HET Lab</option>
+                <option value="Both">Both Labs</option>
+            </select>
+            <button id="save-profile-btn" class="btn primary-btn" style="width: 100%; margin-top: 15px;">Save & Continue</button>
+        </div>
     </div>
 
     <div id="dashboard-screen" class="screen">
-        <header>
-            <div class="user-info">
-                <span id="display-name">User</span> | <span id="display-lab">Lab</span>
+        <header class="dashboard-header card">
+            <div class="user-profile">
+                <img id="display-pic" src="https://via.placeholder.com/50" alt="Profile" class="profile-pic">
+                <div class="user-details">
+                    <h3 id="display-name">User Name</h3>
+                    <span id="display-lab" class="badge">Lab</span>
+                </div>
             </div>
-            <div class="status-toggle">
-                <select id="user-status">
-                    <option value="Active">🟢 Active</option>
-                    <option value="Leave">🔴 Leave</option>
-                </select>
-            </div>
+            <select id="user-status" class="status-select">
+                <option value="Active">🟢 Active</option>
+                <option value="Leave">🔴 On Leave</option>
+            </select>
         </header>
-        <button id="fab-add-task">+</button>
+
+        <div class="dashboard-grid">
+            <div class="task-column card">
+                <h3><i class="fas fa-inbox"></i> Open Lab Tasks</h3>
+                <div id="open-tasks-list" class="task-list"></div>
+            </div>
+            <div class="task-column card">
+                <h3><i class="fas fa-tasks"></i> My Accepted Tasks</h3>
+                <div id="my-tasks-list" class="task-list"></div>
+            </div>
+        </div>
+
+        <button id="fab-add-task" class="fab"><i class="fas fa-plus"></i></button>
+    </div>
+
+    <div id="task-modal" class="modal">
+        <div class="modal-content card">
+            <h3>Create New Task</h3>
+            <input type="text" id="task-title" placeholder="Task Title" class="input-field">
+            <textarea id="task-details" placeholder="Details & Location" class="input-field" rows="3"></textarea>
+            <input type="text" id="task-time" placeholder="Time Needed (e.g., 2 hours)" class="input-field">
+            <input type="text" id="task-manager" placeholder="Manager Name" class="input-field">
+            
+            <label class="input-label">Target Lab:</label>
+            <select id="task-target-lab" class="input-field">
+                <option value="PVL">PVL Only</option>
+                <option value="HET">HET Only</option>
+                <option value="Both">Both</option>
+            </select>
+
+            <label class="input-label">Assign To:</label>
+            <select id="task-assignee" class="input-field">
+                <option value="All">Broadcast to All</option>
+            </select>
+
+            <div class="modal-actions">
+                <button id="close-modal-btn" class="btn secondary-btn">Cancel</button>
+                <button id="submit-task-btn" class="btn primary-btn">Assign Task</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="debug-panel" class="debug-panel hidden">
+        <div class="debug-header">
+            <span>🛠 Debug Console</span>
+            <button id="toggle-debug" style="background:none; border:none; color:white; font-size:1.2rem;">⬇</button>
+        </div>
+        <div id="debug-log" class="debug-log"></div>
     </div>
 
     <script type="module" src="app.js"></script>
