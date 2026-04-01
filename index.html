@@ -29,7 +29,6 @@
             <input type="tel" id="phone-number" placeholder="+91 98765 43210" class="input-field">
             <div id="recaptcha-container" style="margin-top: 10px;"></div>
             <button id="send-otp-btn" class="btn secondary-btn" style="width: 100%; margin-top: 10px;"><i class="fas fa-sms"></i> Send OTP</button>
-
             <div id="otp-section" style="display: none; margin-top: 15px;">
                 <input type="text" id="otp-code" placeholder="Enter 6-digit OTP" class="input-field">
                 <button id="verify-otp-btn" class="btn primary-btn" style="width: 100%; margin-top: 10px;">Verify OTP</button>
@@ -39,16 +38,16 @@
 
     <div id="profile-screen" class="screen">
         <div class="card">
-            <h2>Complete Profile</h2>
+            <h2>Your Profile</h2>
             <input type="text" id="prof-name" placeholder="Full Name" class="input-field">
-            <input type="email" id="prof-email" placeholder="Gmail Address" class="input-field" style="display: none;">
-            <input type="tel" id="prof-phone" placeholder="Phone Number (+91...)" class="input-field" style="display: none;">
+            <input type="email" id="prof-email" placeholder="Gmail Address" class="input-field">
+            <input type="tel" id="prof-phone" placeholder="Phone Number (+91...)" class="input-field">
             <select id="prof-lab" class="input-field">
                 <option value="PVL">PVL Lab</option>
                 <option value="HET">HET Lab</option>
                 <option value="Both">Both Labs</option>
             </select>
-            <button id="save-profile-btn" class="btn primary-btn" style="width: 100%; margin-top: 15px;">Save & Continue</button>
+            <button id="save-profile-btn" class="btn primary-btn" style="width: 100%; margin-top: 15px;">Save Profile</button>
         </div>
     </div>
 
@@ -57,7 +56,10 @@
             <div class="user-profile">
                 <img id="display-pic" src="https://ui-avatars.com/api/?name=User&background=2563eb&color=fff" alt="Profile" class="profile-pic" onerror="this.src='https://ui-avatars.com/api/?name=U&background=2563eb&color=fff'">
                 <div class="user-details">
-                    <h3 id="display-name">Loading...</h3>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <h3 id="display-name" style="margin:0; font-size: 1.1rem;">Loading...</h3>
+                        <button id="edit-profile-btn" class="icon-btn" style="padding: 2px 6px; font-size: 0.8rem;" title="Edit Profile"><i class="fas fa-pencil-alt"></i></button>
+                    </div>
                     <span id="display-email" style="display:block; font-size: 0.8rem; color: var(--text-muted);"></span>
                     <span id="display-lab" class="badge">Lab</span>
                 </div>
@@ -97,10 +99,7 @@
             </div>
             <button id="close-chat-btn" class="icon-btn" style="color:white;"><i class="fas fa-times"></i></button>
         </div>
-        
-        <div id="chat-contact-list" class="chat-messages">
-            </div>
-
+        <div id="chat-contact-list" class="chat-messages"></div>
         <div id="chat-conversation-area" class="hidden" style="display: flex; flex-direction: column; flex: 1; height: 100%;">
             <div id="chat-messages" class="chat-messages" style="flex:1;"></div>
             <div class="chat-input-area">
@@ -127,8 +126,9 @@
 
             <label class="input-label">Alert Method:</label>
             <select id="task-assignee" class="input-field">
-                <option value="All">App Flash Only (Broadcast)</option>
-                <option value="WhatsApp">Forward to WhatsApp Group</option>
+                <option value="All">App Flash Only</option>
+                <option value="WhatsApp">WhatsApp Forward Only</option>
+                <option value="BothAlerts">🔥 App Flash + WhatsApp</option>
             </select>
 
             <div class="modal-actions">
