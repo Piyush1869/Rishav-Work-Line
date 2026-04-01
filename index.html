@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,7 +10,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    <!-- Hidden Alarm Audio (Rapido Effect) -->
+    <audio id="task-alarm" loop src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
+    <!-- Top App Bar -->
     <nav class="top-nav">
         <div class="nav-brand"><i class="fas fa-microscope"></i> LabManager</div>
         <div class="nav-actions">
@@ -18,6 +22,7 @@
         </div>
     </nav>
 
+    <!-- Login Screen -->
     <div id="login-screen" class="screen active">
         <div class="card login-card">
             <h2>Welcome Back</h2>
@@ -35,6 +40,7 @@
         </div>
     </div>
 
+    <!-- Profile Setup Screen -->
     <div id="profile-screen" class="screen">
         <div class="card">
             <h2>Complete Profile</h2>
@@ -51,12 +57,14 @@
         </div>
     </div>
 
+    <!-- Main Dashboard -->
     <div id="dashboard-screen" class="screen">
         <header class="dashboard-header card">
             <div class="user-profile">
                 <img id="display-pic" src="https://ui-avatars.com/api/?name=User&background=2563eb&color=fff" alt="Profile" class="profile-pic">
                 <div class="user-details">
                     <h3 id="display-name">Loading...</h3>
+                    <span id="display-email" style="display:block; font-size: 0.8rem; color: #666;"></span>
                     <span id="display-lab" class="badge">Lab</span>
                 </div>
             </div>
@@ -67,23 +75,20 @@
         </header>
 
         <div class="dashboard-grid">
-            <div class="task-column card">
-                <h3><i class="fas fa-inbox"></i> Open Lab Tasks</h3>
-                <div id="open-tasks-list" class="task-list">
-                    <p class="text-muted">Loading tasks...</p>
-                </div>
+            <div class="task-column card" style="border-top: 4px solid #f59e0b;">
+                <h3><i class="fas fa-exclamation-circle" style="color:#f59e0b;"></i> New Pending Tasks</h3>
+                <div id="open-tasks-list" class="task-list"><p class="text-muted">No pending tasks.</p></div>
             </div>
-            <div class="task-column card">
-                <h3><i class="fas fa-tasks"></i> My Accepted Tasks</h3>
-                <div id="my-tasks-list" class="task-list">
-                    <p class="text-muted">Loading tasks...</p>
-                </div>
+            <div class="task-column card" style="border-top: 4px solid #10b981;">
+                <h3><i class="fas fa-check-circle" style="color:#10b981;"></i> My Accepted Tasks</h3>
+                <div id="my-tasks-list" class="task-list"><p class="text-muted">No accepted tasks.</p></div>
             </div>
         </div>
 
         <button id="fab-add-task" class="fab"><i class="fas fa-plus"></i></button>
     </div>
 
+    <!-- Add Task Modal -->
     <div id="task-modal" class="modal">
         <div class="modal-content card">
             <h3>Create New Task</h3>
@@ -101,16 +106,17 @@
 
             <label class="input-label">Assign To:</label>
             <select id="task-assignee" class="input-field">
-                <option value="All">Broadcast to All</option>
+                <option value="All">Broadcast to All (Rings all phones)</option>
             </select>
 
             <div class="modal-actions">
                 <button id="close-modal-btn" class="btn secondary-btn">Cancel</button>
-                <button id="submit-task-btn" class="btn primary-btn">Assign Task</button>
+                <button id="submit-task-btn" class="btn primary-btn">Publish Task</button>
             </div>
         </div>
     </div>
 
+    <!-- Debug Modal -->
     <div id="debug-modal" class="modal">
         <div class="modal-content card" style="background: #111; color: #0f0; border: 1px solid #333;">
             <div style="display:flex; justify-content:space-between; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 10px;">
@@ -125,3 +131,4 @@
     <script type="module" src="app.js"></script>
 </body>
 </html>
+
