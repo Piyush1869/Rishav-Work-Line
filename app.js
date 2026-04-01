@@ -1,20 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
-import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-messaging.js";
+import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
-// === DEBUGGER ===
-const debugLog = document.getElementById('debug-log');
-const debugModal = document.getElementById('debug-modal');
-function logToScreen(msg, isErr=false) { if(debugLog) { debugLog.innerHTML += `<div class="${isErr?'debug-error':''}">> ${msg}</div>`; debugLog.scrollTop = debugLog.scrollHeight; } }
-const origLog = console.log; const origErr = console.error;
-console.log = (...args) => { origLog(...args); logToScreen(args.join(' ')); };
-console.error = (...args) => { origErr(...args); logToScreen(args.join(' '), true); };
-document.getElementById('debug-btn').addEventListener('click', () => debugModal.style.display = 'flex');
-document.getElementById('close-debug-btn').addEventListener('click', () => debugModal.style.display = 'none');
-document.getElementById('clear-debug-btn').addEventListener('click', () => debugLog.innerHTML = '');
-
-// === FIREBASE INIT ===
 const firebaseConfig = {
     apiKey: "AIzaSyC3QMu8G5Q-1Fi8AoB2i3NtlusqjRbFVGg",
     authDomain: "rishav-77936.firebaseapp.com",
@@ -27,58 +14,46 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const messaging = getMessaging(app);
 
 let currentUserDoc = null;
-let activeNotifications = [];
+let previousTasksState = new Map(); 
 
-// === RAPIDO ALARM SYSTEM ===
+// === UI & ALARMS ===
+const flashOverlay = document.getElementById('flash-overlay');
 const alarmAudio = document.getElementById('task-alarm');
 let isRinging = false;
 
-function playAlarm() {
-    if(!isRinging) {
-        alarmAudio.play().catch(e => console.log("Audio autoplay blocked. User must tap the screen first."));
-        isRinging = true;
-    }
-}
-function stopAlarm() {
-    alarmAudio.pause();
-    alarmAudio.currentTime = 0;
-    isRinging = false;
-    // Close all open desktop notifications
-    activeNotifications.forEach(n => n.close());
-    activeNotifications = [];
+function showToast(message, icon = "fa-bell") {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerHTML = `<i class="fas ${icon}" style="color: #10b981;"></i> <span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 4000);
 }
 
-// Request Notification Permission
-async function requestNotificationPermission(user) {
+document.getElementById('enable-alerts-btn').addEventListener('click', async () => {
     try {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-            console.log('Notification permission granted.');
-            // Register service worker manually for Vercel
-            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-            
-            // Note: Generating FCM Token requires VAPID key from Firebase Console.
-            // Leaving this ready for when you generate the key:
-            // const token = await getToken(messaging, { vapidKey: 'YOUR_VAPID_KEY_HERE', serviceWorkerRegistration: registration });
-            // await updateDoc(doc(db, "users", user.uid), { fcmToken: token });
-        } else {
-            console.log('Unable to get permission to notify.');
-        }
-    } catch (error) { console.error('Error requesting permission', error); }
-}
+        await Notification.requestPermission();
+        showToast("Notifications enabled!", "fa-check-circle");
+        alarmAudio.play().then(() => { alarmAudio.pause(); alarmAudio.currentTime = 0; }).catch(e=>{});
+    } catch(e) { }
+});
 
-// === ROUTING & AUTH ===
 const screens = { login: document.getElementById('login-screen'), profile: document.getElementById('profile-screen'), dashboard: document.getElementById('dashboard-screen') };
 function showScreen(screenName) { Object.values(screens).forEach(s => s.classList.remove('active')); screens[screenName].classList.add('active'); }
 
+// === AUTHENTICATION ===
 document.getElementById('login-google-btn').addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()));
+window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { 'size': 'normal' });
+document.getElementById('send-otp-btn').addEventListener('click', () => {
+    signInWithPhoneNumber(auth, document.getElementById('phone-number').value, window.recaptchaVerifier)
+        .then((res) => { window.confirmationResult = res; document.getElementById('otp-section').style.display = 'block'; document.getElementById('send-otp-btn').style.display = 'none'; });
+});
+document.getElementById('verify-otp-btn').addEventListener('click', () => window.confirmationResult.confirm(document.getElementById('otp-code').value));
 
 onAuthStateChanged(auth, async (user) => {
     if (user) {
-        requestNotificationPermission(user); // Ask for push permission on login
         const userSnap = await getDoc(doc(db, "users", user.uid));
         if (userSnap.exists()) {
             currentUserDoc = userSnap.data();
@@ -92,26 +67,60 @@ onAuthStateChanged(auth, async (user) => {
     } else { showScreen('login'); }
 });
 
-// === SAVE PROFILE ===
 document.getElementById('save-profile-btn').addEventListener('click', async () => {
     const user = auth.currentUser;
     const name = document.getElementById('prof-name').value;
-    const email = user.email || document.getElementById('prof-email').value;
-    const photoURL = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=2563eb&color=fff`; 
-    
     const profileData = {
-        uid: user.uid, name: name, email: email,
+        uid: user.uid, name: name, 
+        email: user.email || document.getElementById('prof-email').value,
         phone: user.phoneNumber || document.getElementById('prof-phone').value,
-        lab: document.getElementById('prof-lab').value, status: "Active", photoURL: photoURL
+        lab: document.getElementById('prof-lab').value, status: "Active", 
+        photoURL: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'U')}&background=2563eb&color=fff`
     };
-    
     await setDoc(doc(db, "users", user.uid), profileData);
     currentUserDoc = profileData;
     setupDashboard(user, profileData);
     showScreen('dashboard');
 });
 
-// === DASHBOARD & RAPIDO LIVE SYNC ===
+// === GLOBAL CHAT & NOTICES ===
+const chatPanel = document.getElementById('chat-panel');
+document.getElementById('fab-chat').addEventListener('click', () => chatPanel.classList.remove('hidden'));
+document.getElementById('close-chat-btn').addEventListener('click', () => chatPanel.classList.add('hidden'));
+
+document.getElementById('send-chat-btn').addEventListener('click', async () => {
+    const input = document.getElementById('chat-input');
+    if(!input.value) return;
+    await addDoc(collection(db, "chats"), {
+        text: input.value, senderId: auth.currentUser.uid,
+        senderName: currentUserDoc.name, timestamp: serverTimestamp()
+    });
+    input.value = '';
+});
+
+function listenToChat() {
+    const chatMessages = document.getElementById('chat-messages');
+    const q = query(collection(db, "chats"), orderBy("timestamp", "asc"));
+    onSnapshot(q, (snapshot) => {
+        chatMessages.innerHTML = '';
+        snapshot.forEach(doc => {
+            const msg = doc.data();
+            const isMine = msg.senderId === auth.currentUser.uid;
+            const timeString = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Now';
+            
+            chatMessages.innerHTML += `
+                <div class="chat-msg ${isMine ? 'msg-mine' : 'msg-theirs'}">
+                    <span class="sender">${isMine ? 'You' : msg.senderName}</span>
+                    ${msg.text}
+                    <span class="time">${timeString}</span>
+                </div>
+            `;
+        });
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    });
+}
+
+// === DASHBOARD & TASKS ===
 function setupDashboard(user, profile) {
     document.getElementById('display-name').textContent = profile.name;
     document.getElementById('display-email').textContent = profile.email;
@@ -121,54 +130,42 @@ function setupDashboard(user, profile) {
     document.getElementById('user-status').value = profile.status || "Active";
     document.getElementById('user-status').addEventListener('change', async (e) => await updateDoc(doc(db, "users", user.uid), { status: e.target.value }));
 
-    // Populate Users Dropdown
-    onSnapshot(collection(db, "users"), (snapshot) => {
-        const assigneeSelect = document.getElementById('task-assignee');
-        assigneeSelect.innerHTML = '<option value="All">Broadcast to All (Rings all phones)</option>';
-        snapshot.forEach(doc => {
-            const u = doc.data();
-            if(u.uid !== user.uid) assigneeSelect.innerHTML += `<option value="${u.uid}">${u.name} (${u.lab})</option>`;
-        });
-    });
+    listenToChat(); // Start Chat Listener
 
-    // LISTEN TO TASKS
     onSnapshot(collection(db, "tasks"), (snapshot) => {
         const openList = document.getElementById('open-tasks-list');
         const myList = document.getElementById('my-tasks-list');
         openList.innerHTML = ''; myList.innerHTML = '';
 
-        let unassignedTaskCount = 0;
-        let myCount = 0;
+        let unassignedTaskCount = 0; let myAcceptedCount = 0;
+        let statCreated = 0; let statHelpedByOthers = 0; let statMyAccepted = 0;
 
         snapshot.forEach(taskDoc => {
             const task = taskDoc.data();
+            const taskId = taskDoc.id;
+
+            if(task.createdBy === user.uid) {
+                statCreated++;
+                if(task.status !== "Pending") statHelpedByOthers++;
+            }
+            if(task.acceptedById === user.uid) statMyAccepted++;
+
+            const prevTask = previousTasksState.get(taskId);
+            if (prevTask && prevTask.status === "Pending" && task.status === "Accepted" && task.createdBy === user.uid) {
+                showToast(`${task.acceptedBy} accepted your task!`, 'fa-user-check');
+            }
+            previousTasksState.set(taskId, task);
+
             if ((task.targetLab !== "Both") && (profile.lab !== "Both") && (task.targetLab !== profile.lab)) return;
 
             const taskEl = document.createElement('div');
             taskEl.className = 'task-item';
-            taskEl.innerHTML = `
-                <h4>${task.title}</h4>
-                <p><i class="fas fa-info-circle"></i> ${task.details}</p>
-                <p><i class="far fa-clock"></i> Time: ${task.timeNeeded} | Mgr: ${task.manager}</p>
-            `;
+            taskEl.innerHTML = `<h4>${task.title}</h4><p><i class="fas fa-info-circle"></i> ${task.details}</p><p><i class="far fa-clock"></i> Time: ${task.timeNeeded} | Mgr: ${task.manager}</p>`;
 
-            // PENDING TASKS (Triggers Alarm)
-            if (task.status === "Pending" && (task.assignedTo === "All" || task.assignedTo === user.uid)) {
+            if (task.status === "Pending" && (task.assignedTo === "All" || task.assignedTo === "WhatsApp")) {
                 unassignedTaskCount++;
-                
-                // Show browser notification if permitted
-                if(Notification.permission === 'granted' && !isRinging) {
-                    const n = new Notification("NEW LAB TASK: " + task.title, {
-                        body: `Manager: ${task.manager} | Location: ${task.details}`,
-                        icon: profile.photoURL,
-                        requireInteraction: true // Stays on screen until clicked/dismissed
-                    });
-                    activeNotifications.push(n);
-                }
-
                 const acceptBtn = document.createElement('button');
-                acceptBtn.className = 'task-btn';
-                acceptBtn.style.background = '#f59e0b'; acceptBtn.style.color = 'white';
+                acceptBtn.className = 'task-btn'; acceptBtn.style.background = '#f59e0b'; acceptBtn.style.color = 'white';
                 acceptBtn.innerHTML = '<i class="fas fa-hand-paper"></i> Accept Task';
                 acceptBtn.onclick = async () => {
                     const time = prompt("Expected completion time?");
@@ -176,9 +173,7 @@ function setupDashboard(user, profile) {
                 };
                 taskEl.appendChild(acceptBtn);
                 openList.appendChild(taskEl);
-            } 
-            // ACCEPTED TASKS
-            else if (task.acceptedById === user.uid) {
+            } else if (task.acceptedById === user.uid) {
                 if (task.status !== "Done") {
                     const doneBtn = document.createElement('button');
                     doneBtn.className = 'task-btn done';
@@ -187,41 +182,53 @@ function setupDashboard(user, profile) {
                     taskEl.appendChild(doneBtn);
                 }
                 myList.appendChild(taskEl);
-                myCount++;
+                myAcceptedCount++;
             }
         });
 
-        // RAPIDO EFFECT LOGIC: Ring if unassigned tasks exist, stop if someone accepts
+        document.getElementById('stat-assigned').textContent = statCreated;
+        document.getElementById('stat-helped').textContent = statHelpedByOthers;
+        document.getElementById('stat-accepted').textContent = statMyAccepted;
+
         if (unassignedTaskCount > 0 && profile.status === "Active") {
-            playAlarm();
+            if(!isRinging) { flashOverlay.style.display = 'block'; try { alarmAudio.play(); }catch(e){} isRinging = true; }
         } else {
-            stopAlarm(); // Automatically stops alarm when task goes from Pending -> Accepted
+            flashOverlay.style.display = 'none'; alarmAudio.pause(); alarmAudio.currentTime = 0; isRinging = false;
         }
 
         if (unassignedTaskCount === 0) openList.innerHTML = '<p class="text-muted">No pending tasks right now.</p>';
-        if (myCount === 0) myList.innerHTML = '<p class="text-muted">You have no accepted tasks.</p>';
+        if (myAcceptedCount === 0) myList.innerHTML = '<p class="text-muted">You have no accepted tasks.</p>';
     });
 }
 
-// === MODAL LOGIC ===
+// === TASK CREATION & WHATSAPP INTEGRATION ===
 const taskModal = document.getElementById('task-modal');
 document.getElementById('fab-add-task').addEventListener('click', () => taskModal.style.display = 'flex');
 document.getElementById('close-modal-btn').addEventListener('click', () => taskModal.style.display = 'none');
 
 document.getElementById('submit-task-btn').addEventListener('click', async () => {
     const title = document.getElementById('task-title').value;
+    const details = document.getElementById('task-details').value;
+    const timeNeeded = document.getElementById('task-time').value;
+    const manager = document.getElementById('task-manager').value;
+    const alertMethod = document.getElementById('task-assignee').value;
+
     if(!title) { alert("Title is required!"); return; }
     
     await addDoc(collection(db, "tasks"), {
-        title: title,
-        details: document.getElementById('task-details').value,
-        timeNeeded: document.getElementById('task-time').value,
-        manager: document.getElementById('task-manager').value,
-        targetLab: document.getElementById('task-target-lab').value,
-        assignedTo: document.getElementById('task-assignee').value,
-        status: "Pending", createdBy: auth.currentUser.uid, timestamp: new Date()
+        title: title, details: details, timeNeeded: timeNeeded, manager: manager,
+        targetLab: document.getElementById('task-target-lab').value, assignedTo: alertMethod,
+        status: "Pending", createdBy: auth.currentUser.uid, timestamp: serverTimestamp()
     });
     
     taskModal.style.display = 'none';
     document.getElementById('task-title').value = ''; document.getElementById('task-details').value = '';
+    showToast("Task Published!", "fa-check");
+
+    // WHATSAPP FORWARDING LOGIC
+    if (alertMethod === "WhatsApp") {
+        const waText = `🚨 *NEW LAB TASK: ${title}* 🚨\n\n📌 *Details:* ${details}\n⏰ *Time:* ${timeNeeded}\n👨‍💼 *Manager:* ${manager}\n\n👉 Open the LabManager App to accept!`;
+        const waLink = `https://wa.me/?text=${encodeURIComponent(waText)}`;
+        window.open(waLink, '_blank'); // Opens WhatsApp with pre-filled text
+    }
 });
