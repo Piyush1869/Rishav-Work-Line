@@ -1,9 +1,11 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, where, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
-// === ON-SCREEN DEBUGGER ===
+// === ON-SCREEN DEBUGGER (Moved to Top Nav Modal) ===
 const debugLog = document.getElementById('debug-log');
+const debugModal = document.getElementById('debug-modal');
+
 function logToScreen(msg, isError = false) {
     if(debugLog) {
         debugLog.innerHTML += `<div class="${isError ? 'debug-error' : ''}">> ${msg}</div>`;
@@ -14,9 +16,9 @@ const origLog = console.log; const origErr = console.error;
 console.log = (...args) => { origLog(...args); logToScreen(args.join(' ')); };
 console.error = (...args) => { origErr(...args); logToScreen(args.join(' '), true); };
 
-document.getElementById('toggle-debug').addEventListener('click', () => {
-    document.getElementById('debug-panel').classList.toggle('hidden');
-});
+document.getElementById('debug-btn').addEventListener('click', () => { debugModal.style.display = 'flex'; });
+document.getElementById('close-debug-btn').addEventListener('click', () => { debugModal.style.display = 'none'; });
+document.getElementById('clear-debug-btn').addEventListener('click', () => { debugLog.innerHTML = ''; });
 
 console.log("App initializing...");
 
@@ -41,7 +43,7 @@ const installBtn = document.getElementById('install-app-btn');
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    installBtn.style.display = 'block';
+    installBtn.style.display = 'inline-flex';
 });
 installBtn.addEventListener('click', async () => {
     if (deferredPrompt) {
@@ -108,11 +110,14 @@ onAuthStateChanged(auth, async (user) => {
 // === SAVE PROFILE ===
 document.getElementById('save-profile-btn').addEventListener('click', async () => {
     const user = auth.currentUser;
-    const photoURL = user.photoURL || 'https://via.placeholder.com/50'; 
+    const name = document.getElementById('prof-name').value;
+    
+    // Dynamic Fallback Avatar using their name
+    const photoURL = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=2563eb&color=fff`; 
     
     const profileData = {
         uid: user.uid,
-        name: document.getElementById('prof-name').value,
+        name: name,
         email: user.email || document.getElementById('prof-email').value,
         phone: user.phoneNumber || document.getElementById('prof-phone').value,
         lab: document.getElementById('prof-lab').value,
@@ -122,7 +127,7 @@ document.getElementById('save-profile-btn').addEventListener('click', async () =
     
     try {
         await setDoc(doc(db, "users", user.uid), profileData);
-        console.log("Profile Saved");
+        console.log("Profile Saved Successfully");
         currentUserDoc = profileData;
         setupDashboard(user, profileData);
         showScreen('dashboard');
@@ -131,7 +136,7 @@ document.getElementById('save-profile-btn').addEventListener('click', async () =
     }
 });
 
-// === DASHBOARD & LIVE TASKS ===
+// === DASHBOARD & LIVE TASKS (FIXED QUERY) ===
 function setupDashboard(user, profile) {
     document.getElementById('display-name').textContent = profile.name;
     document.getElementById('display-lab').textContent = profile.lab;
@@ -155,16 +160,24 @@ function setupDashboard(user, profile) {
         });
     });
 
-    // LISTEN TO TASKS (Real-time Full Functionality)
-    const q = query(collection(db, "tasks"), where("targetLab", "in", [profile.lab, "Both"]));
-    onSnapshot(q, (snapshot) => {
+    // Fetch ALL tasks and filter securely in JavaScript to bypass Firestore limitations
+    const tasksRef = collection(db, "tasks");
+    onSnapshot(tasksRef, (snapshot) => {
         const openList = document.getElementById('open-tasks-list');
         const myList = document.getElementById('my-tasks-list');
-        openList.innerHTML = ''; myList.innerHTML = '';
+        openList.innerHTML = ''; 
+        myList.innerHTML = '';
+
+        let openCount = 0;
+        let myCount = 0;
 
         snapshot.forEach(taskDoc => {
             const task = taskDoc.data();
             
+            // SECURITY FILTER: Does this task belong to this user's lab?
+            const isForMyLab = (task.targetLab === "Both") || (profile.lab === "Both") || (task.targetLab === profile.lab);
+            if (!isForMyLab) return; // Skip rendering this task
+
             const taskEl = document.createElement('div');
             taskEl.className = 'task-item';
             taskEl.innerHTML = `
@@ -188,6 +201,7 @@ function setupDashboard(user, profile) {
                 };
                 taskEl.appendChild(acceptBtn);
                 openList.appendChild(taskEl);
+                openCount++;
             } 
             // My Accepted Tasks Logic
             else if (task.acceptedById === user.uid) {
@@ -202,8 +216,15 @@ function setupDashboard(user, profile) {
                     taskEl.appendChild(doneBtn);
                 }
                 myList.appendChild(taskEl);
+                myCount++;
             }
         });
+
+        // Show Empty State Messages if no tasks exist
+        if (openCount === 0) openList.innerHTML = '<p class="text-muted">No pending tasks right now.</p>';
+        if (myCount === 0) myList.innerHTML = '<p class="text-muted">You have no accepted tasks.</p>';
+    }, (error) => {
+        console.error("Task Sync Error: ", error.message);
     });
 }
 
@@ -214,7 +235,7 @@ document.getElementById('close-modal-btn').addEventListener('click', () => { tas
 
 document.getElementById('submit-task-btn').addEventListener('click', async () => {
     const title = document.getElementById('task-title').value;
-    if(!title) { alert("Title required"); return; }
+    if(!title) { alert("Title is required!"); return; }
     
     const taskData = {
         title: title,
@@ -230,10 +251,13 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
 
     try {
         await addDoc(collection(db, "tasks"), taskData);
-        console.log("Task Added!");
+        console.log("Task Published Successfully!");
         taskModal.style.display = 'none';
+        // Reset Inputs
         document.getElementById('task-title').value = '';
         document.getElementById('task-details').value = '';
+        document.getElementById('task-time').value = '';
+        document.getElementById('task-manager').value = '';
     } catch (e) {
         console.error("Error adding task: ", e.message);
     }
