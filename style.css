@@ -1,0 +1,20 @@
+body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f7f6; }
+.screen { display: none; padding: 20px; }
+.screen.active { display: block; }
+
+#login-screen, #profile-screen { text-align: center; margin-top: 20%; }
+input, select, textarea { width: 90%; max-width: 400px; margin: 10px auto; padding: 10px; display: block; }
+button { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; border-radius: 5px; }
+
+header { display: flex; justify-content: space-between; background: #fff; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+.notice-board { background: #ffeeba; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+
+.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.task-column { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 300px; }
+
+.task-card { border-left: 4px solid #007bff; padding: 10px; margin-bottom: 10px; background: #f9f9f9; }
+
+#fab-add-task { position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%; font-size: 30px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+.modal-content { background: white; margin: 10% auto; padding: 20px; width: 90%; max-width: 500px; border-radius: 8px; }
