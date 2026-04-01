@@ -19,10 +19,15 @@ let currentUserDoc = null;
 let previousTasksState = new Map(); 
 
 // PWA Install
-if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
-let deferredPrompt; const installBtn = document.getElementById('install-app-btn');
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'inline-flex'; });
-installBtn.addEventListener('click', async () => { if (deferredPrompt) { deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; if (outcome === 'accepted') installBtn.style.display = 'none'; deferredPrompt = null; } });
+// === PWA APP INSTALL LOGIC ===
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then(reg => {
+            console.log('SW Registered!', reg);
+        }).catch(err => console.error('SW Failed!', err));
+    });
+}
+
 
 // === UI & ALARMS (Now with Blue Glow) ===
 const flashOverlay = document.getElementById('flash-overlay');
