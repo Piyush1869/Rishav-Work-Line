@@ -294,8 +294,23 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
     
     taskModal.style.display = 'none';
     document.getElementById('task-title').value = ''; document.getElementById('task-details').value = '';
-    showToast("Task Published!", "fa-check");
+        showToast("Task Published!", "fa-check");
 
+    // === FREE BACKGROUND PUSH NOTIFICATION (NTFY) ===
+    if (alertMethod === "All" || alertMethod === "BothAlerts") {
+        fetch('https://ntfy.sh/rishav_lab_alerts_2026', {
+            method: 'POST',
+            body: `Manager: ${manager}\nTime: ${timeNeeded}\nDetails: ${details}`,
+            headers: {
+                'Title': `🚨 NEW LAB TASK: ${title}`,
+                'Priority': 'urgent', // This forces it to ring loudly!
+                'Tags': 'warning,rotating_light',
+                'Click': 'https://rishav-work-line.vercel.app/' // Opens your app when clicked
+            }
+        }).catch(err => console.log("Ntfy error:", err));
+    }
+
+    // === WHATSAPP FORWARDING LOGIC ===
     if (alertMethod === "WhatsApp" || alertMethod === "BothAlerts") {
         const waText = `🚨 *NEW LAB TASK: ${title}* 🚨\n\n📌 *Details:* ${details}\n⏰ *Time:* ${timeNeeded}\n👨‍💼 *Manager:* ${manager}\n\n👉 Open the LabManager App to accept!`;
         window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank');
