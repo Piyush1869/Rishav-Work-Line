@@ -86,13 +86,16 @@
                 <h3><i class="fas fa-check-circle" style="color:#10b981;"></i> My Lab Tasks</h3>
                 <div id="my-tasks-list" class="task-list"><p class="text-muted">No accepted tasks.</p></div>
             </div>
+            
             <div class="task-column card" style="border-top: 4px solid #8b5cf6;">
-                <h3><i class="fas fa-lock" style="color:#8b5cf6;"></i> My Private Tasks</h3>
-                <div id="private-tasks-list" class="task-list"><p class="text-muted">No private tasks.</p></div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0;"><i class="fas fa-lock" style="color:#8b5cf6;"></i> My Schedule</h3>
+                    <button id="inline-add-priv-btn" style="background: #8b5cf6; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold;"><i class="fas fa-plus"></i> Add</button>
+                </div>
+                <div id="private-tasks-list" class="task-list" style="margin-top: 15px;"><p class="text-muted">No private tasks.</p></div>
             </div>
         </div>
 
-        <button id="fab-private-task" class="fab" style="bottom: 165px; background: #8b5cf6;" title="Add Private Task"><i class="fas fa-user-lock"></i></button>
         <button id="fab-chat" class="fab" style="bottom: 95px; background: #10b981;" title="Chat Directory"><i class="fas fa-comments"></i></button>
         <button id="fab-add-task" class="fab" title="Add Lab Task"><i class="fas fa-plus"></i></button>
     </div>
