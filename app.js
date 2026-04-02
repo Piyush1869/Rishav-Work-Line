@@ -18,8 +18,9 @@ const db = getFirestore(app);
 let currentUserDoc = null;
 let previousTasksState = new Map(); 
 
-// YOUR GOOGLE SHEETS URL IS SAVED HERE
+// === EXTERNAL INTEGRATIONS ===
 const GOOGLE_SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbwZofHJ2_XKmrTyw9qFdZmsmYifOdYawaiyed75yZV9JQBjqIRu9Qc8PooetfQSZqU3/exec";
+const NTFY_AUTH_TOKEN = "Tk_1r6v82p1z3j5n7acv5jso0ksa35lc";
 
 // === GOOGLE SHEETS SYNC LOGIC ===
 async function logToGoogleSheets(taskData) {
@@ -113,10 +114,20 @@ const chatPanel = document.getElementById('chat-panel'); const contactListArea =
 document.getElementById('fab-chat').addEventListener('click', () => { chatPanel.classList.remove('hidden'); showContactList(); });
 document.getElementById('close-chat-btn').addEventListener('click', () => chatPanel.classList.add('hidden'));
 backBtn.addEventListener('click', () => showContactList());
+
 function showContactList() { currentChatUserId = null; if(chatUnsubscribe) { chatUnsubscribe(); chatUnsubscribe = null; } backBtn.classList.add('hidden'); chatTitle.innerHTML = `<i class="fas fa-address-book"></i> Contacts`; conversationArea.classList.add('hidden'); contactListArea.classList.remove('hidden'); }
-function openDirectChat(targetUser) { currentChatUserId = targetUser.uid; backBtn.classList.remove('hidden'); chatTitle.textContent = targetUser.name; contactListArea.classList.add('hidden'); conversationArea.classList.remove('hidden'); const chatId = getChatId(auth.currentUser.uid, targetUser.uid); const chatMessages = document.getElementById('chat-messages'); if(chatUnsubscribe) chatUnsubscribe(); 
-    chatUnsubscribe = onSnapshot(query(collection(db, "direct_messages"), where("chatId", "==", chatId)), (snapshot) => { const msgs = []; snapshot.forEach(doc => msgs.push(doc.data())); msgs.sort((a, b) => { const timeA = a.timestamp ? a.timestamp.toMillis() : Date.now(); const timeB = b.timestamp ? b.timestamp.toMillis() : Date.now(); return timeA - timeB; }); chatMessages.innerHTML = ''; msgs.forEach(msg => { const isMine = msg.senderId === auth.currentUser.uid; const timeString = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Sending...'; chatMessages.innerHTML += `<div class="chat-msg ${isMine ? 'msg-mine' : 'msg-theirs'}">${msg.text}<span class="time">${timeString}</span></div>`; }); chatMessages.scrollTop = chatMessages.scrollHeight; });
+
+function openDirectChat(targetUser) { 
+    currentChatUserId = targetUser.uid; backBtn.classList.remove('hidden'); chatTitle.textContent = targetUser.name; contactListArea.classList.add('hidden'); conversationArea.classList.remove('hidden'); const chatId = getChatId(auth.currentUser.uid, targetUser.uid); const chatMessages = document.getElementById('chat-messages'); if(chatUnsubscribe) chatUnsubscribe(); 
+    chatUnsubscribe = onSnapshot(query(collection(db, "direct_messages"), where("chatId", "==", chatId)), (snapshot) => { 
+        const msgs = []; snapshot.forEach(doc => msgs.push(doc.data())); 
+        msgs.sort((a, b) => { const timeA = a.timestamp ? a.timestamp.toMillis() : Date.now(); const timeB = b.timestamp ? b.timestamp.toMillis() : Date.now(); return timeA - timeB; }); 
+        chatMessages.innerHTML = ''; 
+        msgs.forEach(msg => { const isMine = msg.senderId === auth.currentUser.uid; const timeString = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Sending...'; chatMessages.innerHTML += `<div class="chat-msg ${isMine ? 'msg-mine' : 'msg-theirs'}">${msg.text}<span class="time">${timeString}</span></div>`; }); 
+        chatMessages.scrollTop = chatMessages.scrollHeight; 
+    });
 }
+
 async function sendChatMessage() { const input = document.getElementById('chat-input'); const text = input.value; if(!text || !currentChatUserId) return; input.value = ''; await addDoc(collection(db, "direct_messages"), { chatId: getChatId(auth.currentUser.uid, currentChatUserId), text: text, senderId: auth.currentUser.uid, timestamp: serverTimestamp() }); }
 document.getElementById('send-chat-btn').addEventListener('click', sendChatMessage); document.getElementById('chat-input').addEventListener('keypress', (e) => { if(e.key === 'Enter') sendChatMessage(); });
 
@@ -159,7 +170,7 @@ function setupDashboard(user, profile) {
                         nextStatusBtn.onclick = async () => {
                             const newStatus = task.status === "Upcoming" ? "Ongoing" : "Done";
                             await updateDoc(taskDoc.ref, { status: newStatus });
-                            logToGoogleSheets({ ...task, status: newStatus }); // Send update to Sheets
+                            logToGoogleSheets({ ...task, status: newStatus }); 
                         };
                         pEl.appendChild(nextStatusBtn);
                     }
@@ -190,7 +201,7 @@ function setupDashboard(user, profile) {
                     const time = prompt("Expected completion time?");
                     if(time) {
                         await updateDoc(taskDoc.ref, { status: "Accepted", acceptedBy: profile.name, acceptedById: user.uid, expectedTime: time });
-                        logToGoogleSheets({ ...task, status: "Accepted" }); // Send to Sheets
+                        logToGoogleSheets({ ...task, status: "Accepted" }); 
                     }
                 };
                 taskEl.appendChild(acceptBtn); openList.appendChild(taskEl);
@@ -199,7 +210,7 @@ function setupDashboard(user, profile) {
                     const doneBtn = document.createElement('button'); doneBtn.className = 'task-btn done'; doneBtn.innerHTML = '<i class="fas fa-check"></i> Mark as Done';
                     doneBtn.onclick = async () => {
                         await updateDoc(taskDoc.ref, { status: "Done" });
-                        logToGoogleSheets({ ...task, status: "Done" }); // Send to Sheets
+                        logToGoogleSheets({ ...task, status: "Done" }); 
                     };
                     taskEl.appendChild(doneBtn);
                 }
@@ -218,7 +229,7 @@ function setupDashboard(user, profile) {
     });
 }
 
-// === LAB TASK CREATION & NTFY PUSH ===
+// === LAB TASK CREATION & SECURE NTFY PUSH ===
 const taskModal = document.getElementById('task-modal');
 document.getElementById('fab-add-task').addEventListener('click', () => taskModal.style.display = 'flex');
 document.getElementById('close-modal-btn').addEventListener('click', () => taskModal.style.display = 'none');
@@ -238,7 +249,14 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
 
     if (alertMethod === "All" || alertMethod === "BothAlerts") {
         fetch('https://ntfy.sh/rishav_lab_alerts_2026', {
-            method: 'POST', body: title, headers: { 'Title': '🚨 NEW LAB TASK', 'Priority': '5', 'Tags': 'warning' }
+            method: 'POST', 
+            body: title, 
+            headers: { 
+                'Title': '🚨 NEW LAB TASK', 
+                'Priority': '5', 
+                'Tags': 'warning',
+                'Authorization': `Bearer ${NTFY_AUTH_TOKEN}`
+            }
         }).catch(err => console.log("Ntfy error:", err));
     }
 
@@ -247,9 +265,8 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
     }
 });
 
-// === PRIVATE TASK CREATION (Using the New Inline Button) ===
+// === PRIVATE TASK CREATION ===
 const privModal = document.getElementById('private-task-modal');
-// THIS LINKS THE NEW PURPLE BUTTON TO THE MODAL
 document.getElementById('inline-add-priv-btn').addEventListener('click', () => privModal.style.display = 'flex');
 document.getElementById('close-priv-modal-btn').addEventListener('click', () => privModal.style.display = 'none');
 
