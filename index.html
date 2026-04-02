@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Lab Task Manager</title>
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -15,7 +15,9 @@
     <nav class="top-nav">
         <div class="nav-brand"><i class="fas fa-microscope"></i> LabManager</div>
         <div class="nav-actions">
-            <button id="install-app-btn" style="display: none; background: #10b981; color: white;" class="btn"><i class="fas fa-download"></i> Install</button>
+            <a href="https://ntfy.sh/rishav_lab_alerts_2026" target="_blank" class="icon-btn" title="Open Ntfy Alerts" style="color: #10b981;"><i class="fas fa-satellite-dish"></i></a>
+            
+            <button id="install-app-btn" style="display: none; background: #10b981; color: white;" class="btn"><i class="fas fa-download"></i></button>
             <button id="enable-alerts-btn" class="icon-btn" title="Enable Alerts"><i class="fas fa-bell"></i></button>
             <button id="debug-btn" class="icon-btn" title="Open Console"><i class="fas fa-bug"></i></button>
         </div>
@@ -54,13 +56,12 @@
     <div id="dashboard-screen" class="screen">
         <header class="dashboard-header card">
             <div class="user-profile">
-                <img id="display-pic" src="https://ui-avatars.com/api/?name=User&background=2563eb&color=fff" alt="Profile" class="profile-pic" onerror="this.src='https://ui-avatars.com/api/?name=U&background=2563eb&color=fff'">
+                <img id="display-pic" src="" alt="Profile" class="profile-pic" onerror="this.src='https://ui-avatars.com/api/?name=U&background=2563eb&color=fff'">
                 <div class="user-details">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <h3 id="display-name" style="margin:0; font-size: 1.1rem;">Loading...</h3>
-                        <button id="edit-profile-btn" class="icon-btn" style="padding: 2px 6px; font-size: 0.8rem;" title="Edit Profile"><i class="fas fa-pencil-alt"></i></button>
+                        <button id="edit-profile-btn" class="icon-btn" style="padding: 2px 6px; font-size: 0.8rem;"><i class="fas fa-pencil-alt"></i></button>
                     </div>
-                    <span id="display-email" style="display:block; font-size: 0.8rem; color: var(--text-muted);"></span>
                     <span id="display-lab" class="badge">Lab</span>
                 </div>
             </div>
@@ -72,23 +73,28 @@
 
         <div class="stats-container card">
             <div class="stat-box"><h4 id="stat-assigned">0</h4><p>Created</p></div>
-            <div class="stat-box"><h4 id="stat-helped" style="color: #10b981;">0</h4><p>Taken by Others</p></div>
-            <div class="stat-box"><h4 id="stat-accepted" style="color: #f59e0b;">0</h4><p>My Accepted</p></div>
+            <div class="stat-box"><h4 id="stat-helped" style="color: #10b981;">0</h4><p>Helped</p></div>
+            <div class="stat-box"><h4 id="stat-accepted" style="color: #f59e0b;">0</h4><p>Accepted</p></div>
         </div>
 
         <div class="dashboard-grid">
             <div class="task-column card" style="border-top: 4px solid #f59e0b;">
-                <h3><i class="fas fa-exclamation-circle" style="color:#f59e0b;"></i> Pending Tasks</h3>
+                <h3><i class="fas fa-exclamation-circle" style="color:#f59e0b;"></i> Pending Lab Tasks</h3>
                 <div id="open-tasks-list" class="task-list"><p class="text-muted">No pending tasks.</p></div>
             </div>
             <div class="task-column card" style="border-top: 4px solid #10b981;">
-                <h3><i class="fas fa-check-circle" style="color:#10b981;"></i> My Tasks</h3>
+                <h3><i class="fas fa-check-circle" style="color:#10b981;"></i> My Lab Tasks</h3>
                 <div id="my-tasks-list" class="task-list"><p class="text-muted">No accepted tasks.</p></div>
+            </div>
+            <div class="task-column card" style="border-top: 4px solid #8b5cf6;">
+                <h3><i class="fas fa-lock" style="color:#8b5cf6;"></i> My Private Tasks</h3>
+                <div id="private-tasks-list" class="task-list"><p class="text-muted">No private tasks.</p></div>
             </div>
         </div>
 
-        <button id="fab-chat" class="fab" style="bottom: 95px; background: #10b981;"><i class="fas fa-comments"></i></button>
-        <button id="fab-add-task" class="fab"><i class="fas fa-plus"></i></button>
+        <button id="fab-private-task" class="fab" style="bottom: 165px; background: #8b5cf6;" title="Add Private Task"><i class="fas fa-user-lock"></i></button>
+        <button id="fab-chat" class="fab" style="bottom: 95px; background: #10b981;" title="Chat Directory"><i class="fas fa-comments"></i></button>
+        <button id="fab-add-task" class="fab" title="Add Lab Task"><i class="fas fa-plus"></i></button>
     </div>
 
     <div id="chat-panel" class="chat-panel hidden">
@@ -111,26 +117,21 @@
 
     <div id="task-modal" class="modal">
         <div class="modal-content card">
-            <h3>Create New Task</h3>
+            <h3>Create Lab Task</h3>
             <input type="text" id="task-title" placeholder="Task Title" class="input-field">
             <textarea id="task-details" placeholder="Details & Location" class="input-field" rows="3"></textarea>
             <input type="text" id="task-time" placeholder="Time Needed (e.g., 2 hours)" class="input-field">
             <input type="text" id="task-manager" placeholder="Manager Name" class="input-field">
-            
-            <label class="input-label">Target Lab:</label>
             <select id="task-target-lab" class="input-field">
                 <option value="PVL">PVL Only</option>
                 <option value="HET">HET Only</option>
                 <option value="Both">Both</option>
             </select>
-
-            <label class="input-label">Alert Method:</label>
             <select id="task-assignee" class="input-field">
-                <option value="All">App Flash Only</option>
+                <option value="BothAlerts">🔥 App Flash + Ntfy + WhatsApp</option>
+                <option value="All">App Flash + Ntfy Alert Only</option>
                 <option value="WhatsApp">WhatsApp Forward Only</option>
-                <option value="BothAlerts">🔥 App Flash + WhatsApp</option>
             </select>
-
             <div class="modal-actions">
                 <button id="close-modal-btn" class="btn secondary-btn">Cancel</button>
                 <button id="submit-task-btn" class="btn primary-btn">Publish</button>
@@ -138,7 +139,31 @@
         </div>
     </div>
 
+    <div id="private-task-modal" class="modal">
+        <div class="modal-content card" style="border-top: 4px solid #8b5cf6;">
+            <h3><i class="fas fa-lock"></i> Add Private Task</h3>
+            <p class="text-muted" style="margin-top:0;">Only you can see this.</p>
+            <input type="text" id="priv-task-title" placeholder="Task Title" class="input-field">
+            <textarea id="priv-task-details" placeholder="Details" class="input-field" rows="2"></textarea>
+            <div style="display:flex; gap:10px;">
+                <input type="date" id="priv-task-date" class="input-field">
+                <input type="time" id="priv-task-time" class="input-field">
+            </div>
+            <label class="input-label">Status:</label>
+            <select id="priv-task-status" class="input-field">
+                <option value="Upcoming">Upcoming</option>
+                <option value="Pending">Pending</option>
+                <option value="Ongoing">Ongoing</option>
+            </select>
+            <div class="modal-actions">
+                <button id="close-priv-modal-btn" class="btn secondary-btn">Cancel</button>
+                <button id="submit-priv-task-btn" class="btn primary-btn" style="background: #8b5cf6;">Save Private</button>
+            </div>
+        </div>
+    </div>
+
     <div id="toast-container" class="toast-container"></div>
+    
     <div id="debug-modal" class="modal">
         <div class="modal-content card" style="background: #000; color: #0f0; border: 1px solid #333;">
             <div style="display:flex; justify-content:space-between; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 10px;">
