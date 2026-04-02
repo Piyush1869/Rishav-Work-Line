@@ -19,7 +19,9 @@ let currentUserDoc = null;
 let previousTasksState = new Map(); 
 
 // 👇 PASTE YOUR GOOGLE SHEETS WEB APP URL HERE 👇
-const GOOGLE_SHEETS_WEBHOOK = "PASTE_YOUR_WEB_APP_URL_HERE";
+// 👇 PASTE YOUR GOOGLE SHEETS WEB APP URL HERE 👇
+const GOOGLE_SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbwZofHJ2_XKmrTyw9qFdZmsmYifOdYawaiyed75yZV9JQBjqIRu9Qc8PooetfQSZqU3/exec";
+
 
 // === GOOGLE SHEETS SYNC LOGIC ===
 async function logToGoogleSheets(taskData) {
