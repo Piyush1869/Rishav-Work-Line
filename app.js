@@ -18,18 +18,16 @@ const db = getFirestore(app);
 let currentUserDoc = null;
 let previousTasksState = new Map(); 
 
-// 👇 PASTE YOUR GOOGLE SHEETS WEB APP URL HERE 👇
-// 👇 PASTE YOUR GOOGLE SHEETS WEB APP URL HERE 👇
+// YOUR GOOGLE SHEETS URL IS SAVED HERE
 const GOOGLE_SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbwZofHJ2_XKmrTyw9qFdZmsmYifOdYawaiyed75yZV9JQBjqIRu9Qc8PooetfQSZqU3/exec";
-
 
 // === GOOGLE SHEETS SYNC LOGIC ===
 async function logToGoogleSheets(taskData) {
-    if (!GOOGLE_SHEETS_WEBHOOK || GOOGLE_SHEETS_WEBHOOK === "PASTE_YOUR_WEB_APP_URL_HERE") return;
+    if (!GOOGLE_SHEETS_WEBHOOK) return;
     try {
         await fetch(GOOGLE_SHEETS_WEBHOOK, {
             method: 'POST',
-            mode: 'no-cors', // Bypasses browser blocking
+            mode: 'no-cors', 
             headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({
                 userName: currentUserDoc.name,
@@ -108,7 +106,7 @@ document.getElementById('edit-profile-btn').addEventListener('click', () => {
     if (currentUserDoc) { document.getElementById('prof-name').value = currentUserDoc.name || ''; document.getElementById('prof-email').value = currentUserDoc.email || ''; document.getElementById('prof-phone').value = currentUserDoc.phone || ''; document.getElementById('prof-lab').value = currentUserDoc.lab || 'PVL'; document.getElementById('prof-email').style.display = 'block'; document.getElementById('prof-phone').style.display = 'block'; showScreen('profile'); }
 });
 
-// === 1-ON-1 CHAT (Minified to save space) ===
+// === 1-ON-1 CHAT ===
 let currentChatUserId = null; let chatUnsubscribe = null;
 function getChatId(uid1, uid2) { return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`; }
 const chatPanel = document.getElementById('chat-panel'); const contactListArea = document.getElementById('chat-contact-list'); const conversationArea = document.getElementById('chat-conversation-area'); const chatTitle = document.getElementById('chat-panel-title'); const backBtn = document.getElementById('chat-back-btn');
@@ -236,14 +234,11 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
     taskModal.style.display = 'none'; document.getElementById('task-title').value = ''; document.getElementById('task-details').value = '';
     showToast("Task Published!", "fa-check");
 
-    logToGoogleSheets(newTask); // Send to Sheets initially
+    logToGoogleSheets(newTask); 
 
-    // 🚨 NTFY PUSH NOTIFICATION (Fix for strict browsers)
     if (alertMethod === "All" || alertMethod === "BothAlerts") {
         fetch('https://ntfy.sh/rishav_lab_alerts_2026', {
-            method: 'POST',
-            body: title, // Simplified body to ensure delivery
-            headers: { 'Title': '🚨 NEW LAB TASK', 'Priority': '5', 'Tags': 'warning' }
+            method: 'POST', body: title, headers: { 'Title': '🚨 NEW LAB TASK', 'Priority': '5', 'Tags': 'warning' }
         }).catch(err => console.log("Ntfy error:", err));
     }
 
@@ -252,16 +247,16 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
     }
 });
 
-// === PRIVATE TASK CREATION ===
+// === PRIVATE TASK CREATION (Using the New Inline Button) ===
 const privModal = document.getElementById('private-task-modal');
-document.getElementById('fab-private-task').addEventListener('click', () => privModal.style.display = 'flex');
+// THIS LINKS THE NEW PURPLE BUTTON TO THE MODAL
+document.getElementById('inline-add-priv-btn').addEventListener('click', () => privModal.style.display = 'flex');
 document.getElementById('close-priv-modal-btn').addEventListener('click', () => privModal.style.display = 'none');
 
 document.getElementById('submit-priv-task-btn').addEventListener('click', async () => {
     const title = document.getElementById('priv-task-title').value;
     if(!title) { alert("Title is required!"); return; }
 
-    
     const newTask = {
         title: title, details: document.getElementById('priv-task-details').value,
         startDate: document.getElementById('priv-task-date').value, startTime: document.getElementById('priv-task-time').value,
@@ -272,5 +267,5 @@ document.getElementById('submit-priv-task-btn').addEventListener('click', async 
     privModal.style.display = 'none'; document.getElementById('priv-task-title').value = ''; document.getElementById('priv-task-details').value = '';
     showToast("Private Task Saved!", "fa-lock");
 
-    logToGoogleSheets(newTask); // Log private task to Sheets too
+    logToGoogleSheets(newTask); 
 });
