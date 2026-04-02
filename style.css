@@ -105,3 +105,9 @@ body {
 .hidden { display: none !important; }
 
 @media (min-width: 768px) { .dashboard-grid { grid-template-columns: repeat(2, 1fr); } .screen { padding: 30px; } }
+
+/* Private Task Specific Colors */
+.priv-btn { background: rgba(139, 92, 246, 0.2); color: #a78bfa; font-weight: bold; cursor: pointer; border: none; padding: 10px; width: 100%; border-radius: 6px; margin-top: 10px; }
+.priv-badge { background: #8b5cf6; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: bold; float: right; }
+.task-column:nth-child(3) .task-item { border-left-color: #8b5cf6; }
+
