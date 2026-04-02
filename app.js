@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc, serverTimestamp, orderBy, where } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+// Notice: We removed 'orderBy' because we will sort it manually to bypass the Firebase Index error!
+import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyC3QMu8G5Q-1Fi8AoB2i3NtlusqjRbFVGg",
@@ -18,49 +19,19 @@ const db = getFirestore(app);
 let currentUserDoc = null;
 let previousTasksState = new Map(); 
 
-// PWA Install
 // === PWA APP INSTALL LOGIC ===
-let deferredPrompt;
-const installBtn = document.getElementById('install-app-btn');
+if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
+let deferredPrompt; const installBtn = document.getElementById('install-app-btn');
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'inline-flex'; });
+installBtn.addEventListener('click', async () => { if (deferredPrompt) { deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; if (outcome === 'accepted') installBtn.style.display = 'none'; deferredPrompt = null; } });
 
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    installBtn.style.display = 'inline-flex'; // SHOWS THE GREEN BUTTON
-    console.log("PWA Install Ready!");
-});
-
-installBtn.addEventListener('click', async () => {
-    if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') {
-            installBtn.style.display = 'none';
-        }
-        deferredPrompt = null;
-    }
-});
-
-// Register the Service Worker
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-        .then(reg => console.log('SW Registered', reg))
-        .catch(err => console.error('SW Failed', err));
-    });
-}
-
-
-// === UI & ALARMS (Now with Blue Glow) ===
+// === UI & ALARMS ===
 const flashOverlay = document.getElementById('flash-overlay');
 const alarmAudio = document.getElementById('task-alarm');
 const alertBtn = document.getElementById('enable-alerts-btn');
 let isRinging = false;
 
-// Check if already granted on load, apply glow
-if (Notification.permission === 'granted') {
-    alertBtn.classList.add('glow-blue');
-}
+if (Notification.permission === 'granted') { alertBtn.classList.add('glow-blue'); }
 
 function showToast(message, icon = "fa-bell") {
     const container = document.getElementById('toast-container');
@@ -71,24 +42,16 @@ function showToast(message, icon = "fa-bell") {
 }
 
 alertBtn.addEventListener('click', async () => {
-    if(Notification.permission === 'granted') {
-        showToast("Alerts already active!", "fa-check-circle");
-        return;
-    }
+    if(Notification.permission === 'granted') { showToast("Alerts already active!", "fa-check-circle"); return; }
     try { 
         const perm = await Notification.requestPermission();
-        if(perm === 'granted') {
-            alertBtn.classList.add('glow-blue');
-            showToast("Alerts enabled!", "fa-check-circle"); 
-            alarmAudio.play().then(() => { alarmAudio.pause(); alarmAudio.currentTime = 0; }).catch(e=>{}); 
-        }
+        if(perm === 'granted') { alertBtn.classList.add('glow-blue'); showToast("Alerts enabled!", "fa-check-circle"); alarmAudio.play().then(() => { alarmAudio.pause(); alarmAudio.currentTime = 0; }).catch(e=>{}); }
     } catch(e) { }
 });
 
 const screens = { login: document.getElementById('login-screen'), profile: document.getElementById('profile-screen'), dashboard: document.getElementById('dashboard-screen') };
 function showScreen(screenName) { Object.values(screens).forEach(s => s.classList.remove('active')); screens[screenName].classList.add('active'); }
 
-// Debugger
 const debugLog = document.getElementById('debug-log');
 function logToScreen(msg) { if(debugLog) { debugLog.innerHTML += `<div>> ${msg}</div>`; debugLog.scrollTop = debugLog.scrollHeight; } }
 console.log = (...args) => { logToScreen(args.join(' ')); };
@@ -140,15 +103,13 @@ document.getElementById('edit-profile-btn').addEventListener('click', () => {
         document.getElementById('prof-email').value = currentUserDoc.email || '';
         document.getElementById('prof-phone').value = currentUserDoc.phone || '';
         document.getElementById('prof-lab').value = currentUserDoc.lab || 'PVL';
-        
-        // Ensure both inputs are visible so user can fill them manually
         document.getElementById('prof-email').style.display = 'block';
         document.getElementById('prof-phone').style.display = 'block';
         showScreen('profile');
     }
 });
 
-// === 1-ON-1 DIRECT MESSAGING ===
+// === 1-ON-1 DIRECT MESSAGING (FIXED) ===
 let currentChatUserId = null; let chatUnsubscribe = null;
 function getChatId(uid1, uid2) { return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`; }
 
@@ -176,26 +137,55 @@ function openDirectChat(targetUser) {
     const chatMessages = document.getElementById('chat-messages');
 
     if(chatUnsubscribe) chatUnsubscribe(); 
-    const q = query(collection(db, "direct_messages"), where("chatId", "==", chatId), orderBy("timestamp", "asc"));
+    
+    // We removed orderBy to fix the Firebase Error! We will sort it below instead.
+    const q = query(collection(db, "direct_messages"), where("chatId", "==", chatId));
+    
     chatUnsubscribe = onSnapshot(q, (snapshot) => {
+        const msgs = [];
+        snapshot.forEach(doc => msgs.push(doc.data()));
+
+        // SORTING IN JAVASCRIPT: Bypasses the Missing Index Error completely!
+        msgs.sort((a, b) => {
+            const timeA = a.timestamp ? a.timestamp.toMillis() : Date.now();
+            const timeB = b.timestamp ? b.timestamp.toMillis() : Date.now();
+            return timeA - timeB;
+        });
+
         chatMessages.innerHTML = '';
-        snapshot.forEach(doc => {
-            const msg = doc.data(); const isMine = msg.senderId === auth.currentUser.uid;
-            const timeString = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Now';
+        msgs.forEach(msg => {
+            const isMine = msg.senderId === auth.currentUser.uid;
+            const timeString = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Sending...';
             chatMessages.innerHTML += `<div class="chat-msg ${isMine ? 'msg-mine' : 'msg-theirs'}">${msg.text}<span class="time">${timeString}</span></div>`;
         });
         chatMessages.scrollTop = chatMessages.scrollHeight;
+    }, (error) => {
+        console.error("Chat Error:", error.message);
     });
 }
 
-document.getElementById('send-chat-btn').addEventListener('click', async () => {
+// Fixed Send Logic
+async function sendChatMessage() {
     const input = document.getElementById('chat-input');
-    if(!input.value || !currentChatUserId) return;
-    await addDoc(collection(db, "direct_messages"), {
-        chatId: getChatId(auth.currentUser.uid, currentChatUserId),
-        text: input.value, senderId: auth.currentUser.uid, timestamp: serverTimestamp()
-    });
-    input.value = '';
+    const text = input.value;
+    if(!text || !currentChatUserId) return;
+    
+    input.value = ''; // Clear box immediately
+    
+    try {
+        await addDoc(collection(db, "direct_messages"), {
+            chatId: getChatId(auth.currentUser.uid, currentChatUserId),
+            text: text, senderId: auth.currentUser.uid, timestamp: serverTimestamp()
+        });
+    } catch (error) {
+        console.error("Send failed:", error.message);
+    }
+}
+
+document.getElementById('send-chat-btn').addEventListener('click', sendChatMessage);
+// Added: Pressing Enter to send a message!
+document.getElementById('chat-input').addEventListener('keypress', (e) => {
+    if(e.key === 'Enter') sendChatMessage();
 });
 
 // === DASHBOARD & TASKS ===
@@ -246,13 +236,9 @@ function setupDashboard(user, profile) {
             const taskEl = document.createElement('div'); taskEl.className = 'task-item';
             taskEl.innerHTML = `<h4>${task.title}</h4><p><i class="fas fa-info-circle"></i> ${task.details}</p><p><i class="far fa-clock"></i> Time: ${task.timeNeeded} | Mgr: ${task.manager}</p>`;
 
-            // App Flash activates for "All" or "BothAlerts"
             if (task.status === "Pending" && (task.assignedTo === "All" || task.assignedTo === "WhatsApp" || task.assignedTo === "BothAlerts" || task.assignedTo === user.uid)) {
                 
-                // Only count towards ringing if it's meant to flash the app (All or BothAlerts)
-                if (task.assignedTo === "All" || task.assignedTo === "BothAlerts") {
-                    unassignedTaskCount++;
-                }
+                if (task.assignedTo === "All" || task.assignedTo === "BothAlerts") { unassignedTaskCount++; }
 
                 const acceptBtn = document.createElement('button');
                 acceptBtn.className = 'task-btn'; acceptBtn.style.background = 'rgba(245, 158, 11, 0.2)'; acceptBtn.style.color = '#fbbf24';
@@ -288,7 +274,7 @@ function setupDashboard(user, profile) {
     });
 }
 
-// === TASK CREATION (With Combined BothAlerts Option) ===
+// === TASK CREATION ===
 const taskModal = document.getElementById('task-modal');
 document.getElementById('fab-add-task').addEventListener('click', () => taskModal.style.display = 'flex');
 document.getElementById('close-modal-btn').addEventListener('click', () => taskModal.style.display = 'none');
@@ -310,7 +296,6 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
     document.getElementById('task-title').value = ''; document.getElementById('task-details').value = '';
     showToast("Task Published!", "fa-check");
 
-    // WHATSAPP TRIGGER (Runs if WhatsApp Only OR BothAlerts is selected)
     if (alertMethod === "WhatsApp" || alertMethod === "BothAlerts") {
         const waText = `🚨 *NEW LAB TASK: ${title}* 🚨\n\n📌 *Details:* ${details}\n⏰ *Time:* ${timeNeeded}\n👨‍💼 *Manager:* ${manager}\n\n👉 Open the LabManager App to accept!`;
         window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank');
