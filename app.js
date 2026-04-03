@@ -20,25 +20,28 @@ let previousTasksState = new Map();
 
 // === EXTERNAL INTEGRATIONS ===
 const GOOGLE_SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbwZofHJ2_XKmrTyw9qFdZmsmYifOdYawaiyed75yZV9JQBjqIRu9Qc8PooetfQSZqU3/exec";
-const NTFY_AUTH_TOKEN = "Tk_1r6v82p1z3j5n7acv5jso0ksa35lc";
-const NTFY_TOPIC = "rishav_lab_alerts_20"; // Updated to match your screenshot exactly!
+const NTFY_TOPIC = "rishav_lab_alerts_20";
 
-// === MASTER NTFY PUSH FUNCTION ===
+// === MASTER NTFY PUSH FUNCTION (Fixed Auth Issue) ===
 async function sendNtfyAlert(title, message, priorityLevel) {
     try {
-        await fetch(`https://ntfy.sh/${NTFY_TOPIC}`, {
+        const response = await fetch(`https://ntfy.sh/${NTFY_TOPIC}`, {
             method: 'POST',
             body: message,
             headers: {
                 'Title': title,
-                'Priority': priorityLevel.toString(), // 5 = Max (Rings loudly), 4 = High
-                'Tags': priorityLevel === 5 ? 'rotating_light,warning' : 'speech_balloon',
-                'Authorization': `Bearer ${NTFY_AUTH_TOKEN}`
+                'Priority': priorityLevel.toString(), // 5 = Max, 4 = High
+                'Tags': priorityLevel === 5 ? 'rotating_light,warning' : 'speech_balloon'
             }
         });
-        console.log(`Ntfy Push Sent: ${title}`);
+        
+        if (!response.ok) {
+            console.log(`Ntfy Blocked: Error ${response.status}`);
+        } else {
+            console.log(`Ntfy Push Sent: ${title}`);
+        }
     } catch (e) { 
-        console.error("Ntfy Error:", e); 
+        console.error("Ntfy Failed:", e.message); 
     }
 }
 
