@@ -15,7 +15,7 @@
     <nav class="top-nav">
         <div class="nav-brand"><i class="fas fa-microscope"></i> LabManager</div>
         <div class="nav-actions">
-            <a href="https://ntfy.sh/rishav_lab_alerts_2026" target="_blank" class="icon-btn" title="Open Ntfy Alerts" style="color: #10b981;"><i class="fas fa-satellite-dish"></i></a>
+            <a id="nav-ntfy-link" href="https://ntfy.sh/rishav_lab_alerts_2026" target="_blank" class="icon-btn" title="Open Ntfy Alerts" style="color: #10b981;"><i class="fas fa-satellite-dish"></i></a>
             <button id="install-app-btn" style="display: none; background: #10b981; color: white;" class="btn"><i class="fas fa-download"></i></button>
             <button id="enable-alerts-btn" class="icon-btn" title="Enable Alerts"><i class="fas fa-bell"></i></button>
             <button id="debug-btn" class="icon-btn" title="Open Console"><i class="fas fa-bug"></i></button>
@@ -48,6 +48,16 @@
                 <option value="HET">HET Lab</option>
                 <option value="Both">Both Labs</option>
             </select>
+            
+            <div style="margin-top: 15px; padding: 10px; background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; border-radius: 6px;">
+                <label style="font-size: 0.8rem; color: #a7f3d0;"><i class="fas fa-satellite-dish"></i> Your Personal Ntfy Channel</label>
+                <p style="font-size: 0.75rem; color: #888; margin: 4px 0;">Subscribe to this in your Ntfy app to receive Direct Messages!</p>
+                <div style="display: flex; gap: 5px; margin-top: 5px;">
+                    <input type="text" id="prof-ntfy-id" readonly class="input-field" style="margin:0; background: #111; color: #10b981; font-family: monospace; font-size: 0.85rem;" value="Loading...">
+                    <button id="copy-ntfy-btn" class="btn secondary-btn" style="padding: 0 15px;" title="Copy to Clipboard"><i class="fas fa-copy"></i></button>
+                </div>
+            </div>
+
             <button id="save-profile-btn" class="btn primary-btn" style="width: 100%; margin-top: 15px;">Save Profile</button>
         </div>
     </div>
@@ -119,13 +129,12 @@
         
         <div id="chat-contact-list" class="chat-messages" style="flex: 1; overflow-y: auto;">
             <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.85rem; color: #a7f3d0;">
-                <i class="fas fa-info-circle"></i> <strong>Tip:</strong> Subscribe to your personal Ntfy channel on your phone to get direct messages! (Example: <em>rishav_lab_alerts_2026_YourName</em>)
+                <i class="fas fa-info-circle"></i> <strong>Tip:</strong> Subscribe to your personal Ntfy channel on your phone to get direct messages!
             </div>
         </div>
         
         <div id="chat-conversation-area" class="hidden" style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
             <div id="chat-messages" class="chat-messages" style="flex: 1; overflow-y: auto; padding-bottom: 10px;"></div>
-            
             <div class="chat-input-area" style="display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: #1a1a1a; border-top: 1px solid #333; flex-shrink: 0;">
                 <select id="chat-priority" class="input-field" style="width: 100px; margin: 0; padding: 8px; font-size: 0.85rem;">
                     <option value="3">Normal Chat</option>
