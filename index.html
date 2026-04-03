@@ -40,7 +40,7 @@
     <div id="profile-screen" class="screen">
         <div class="card">
             <h2>Your Profile</h2>
-            <input type="text" id="prof-name" placeholder="Full Name" class="input-field">
+            <input type="text" id="prof-name" placeholder="Full Name (No spaces for Ntfy)" class="input-field">
             <input type="email" id="prof-email" placeholder="Gmail Address" class="input-field">
             <input type="tel" id="prof-phone" placeholder="Phone Number (+91...)" class="input-field">
             <select id="prof-lab" class="input-field">
@@ -69,6 +69,16 @@
                 <option value="Leave">🔴 On Leave</option>
             </select>
         </header>
+
+        <div class="card" style="border-top: 4px solid #ef4444; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; color: #ef4444;"><i class="fas fa-bullhorn"></i> Global Notices</h3>
+                <button id="open-notice-btn" style="background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold;">Post Notice</button>
+            </div>
+            <div id="notice-board-list" style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px;">
+                <p class="text-muted">No notices right now.</p>
+            </div>
+        </div>
 
         <div class="stats-container card">
             <div class="stat-box"><h4 id="stat-assigned">0</h4><p>Created</p></div>
@@ -107,14 +117,35 @@
             <button id="close-chat-btn" class="icon-btn" style="color:white;"><i class="fas fa-times"></i></button>
         </div>
         
-        <div id="chat-contact-list" class="chat-messages" style="flex: 1; overflow-y: auto;"></div>
+        <div id="chat-contact-list" class="chat-messages" style="flex: 1; overflow-y: auto;">
+            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.85rem; color: #a7f3d0;">
+                <i class="fas fa-info-circle"></i> <strong>Tip:</strong> Subscribe to your personal Ntfy channel on your phone to get direct messages! (Example: <em>rishav_lab_alerts_2026_YourName</em>)
+            </div>
+        </div>
         
         <div id="chat-conversation-area" class="hidden" style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
             <div id="chat-messages" class="chat-messages" style="flex: 1; overflow-y: auto; padding-bottom: 10px;"></div>
             
-            <div class="chat-input-area" style="display: flex; gap: 10px; padding: 10px; background: #1a1a1a; border-top: 1px solid #333; flex-shrink: 0;">
-                <input type="text" id="chat-input" placeholder="Type a message..." class="input-field" style="margin:0; flex:1;">
+            <div class="chat-input-area" style="display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: #1a1a1a; border-top: 1px solid #333; flex-shrink: 0;">
+                <select id="chat-priority" class="input-field" style="width: 100px; margin: 0; padding: 8px; font-size: 0.85rem;">
+                    <option value="3">Normal Chat</option>
+                    <option value="4" style="color: #ef4444; font-weight: bold;">Urgent 🚨</option>
+                </select>
+                <input type="text" id="chat-input" placeholder="Type a message..." class="input-field" style="margin:0; flex:1; min-width: 150px;">
                 <button id="send-chat-btn" class="btn primary-btn" style="width: 50px; padding: 10px;"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notice-modal" class="modal">
+        <div class="modal-content card" style="border-top: 4px solid #ef4444;">
+            <h3><i class="fas fa-bullhorn"></i> Post Global Notice</h3>
+            <p class="text-muted" style="margin-top:0;">This will ping everyone in the main channel.</p>
+            <input type="text" id="notice-title" placeholder="Notice Title" class="input-field">
+            <textarea id="notice-details" placeholder="Important details..." class="input-field" rows="3"></textarea>
+            <div class="modal-actions">
+                <button id="close-notice-modal-btn" class="btn secondary-btn">Cancel</button>
+                <button id="submit-notice-btn" class="btn primary-btn" style="background: #ef4444;">Post Notice</button>
             </div>
         </div>
     </div>
@@ -138,7 +169,6 @@
     <div id="private-task-modal" class="modal">
         <div class="modal-content card" style="border-top: 4px solid #8b5cf6;">
             <h3><i class="fas fa-lock"></i> Add Private Task</h3>
-            <p class="text-muted" style="margin-top:0;">Only you can see this.</p>
             <input type="text" id="priv-task-title" placeholder="Task Title" class="input-field">
             <textarea id="priv-task-details" placeholder="Details" class="input-field" rows="2"></textarea>
             <div style="display:flex; gap:10px;"><input type="date" id="priv-task-date" class="input-field"><input type="time" id="priv-task-time" class="input-field"></div>
