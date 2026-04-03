@@ -48,16 +48,11 @@ let previousTasksState = new Map();
 const GOOGLE_SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbwZofHJ2_XKmrTyw9qFdZmsmYifOdYawaiyed75yZV9JQBjqIRu9Qc8PooetfQSZqU3/exec";
 
 // ==========================================
-// 🚀 NTFY PUSH LOGIC (Supports Personal Channels & Priorities)
+// 🚀 NTFY PUSH LOGIC
 // ==========================================
 function pushToNtfy(alertTitle, alertMessage, priorityLevel, customTopicSuffix = "") {
-    // 5 = Max (Task), 4 = Urgent Chat/Notice, 3 = Normal Chat, 2 = Low
     const tags = priorityLevel >= 4 ? "rotating_light,warning" : "speech_balloon";
-    
-    // Core topic + Personal Suffix (if provided)
     const topicPath = `rishav_lab_alerts_2026${customTopicSuffix}`;
-    
-    // Encodes Title in URL directly to bypass Browser CORS blocks
     const encodedTitle = encodeURIComponent(alertTitle);
     const topicUrl = `https://ntfy.sh/${topicPath}?title=${encodedTitle}&priority=${priorityLevel}&tags=${tags}`;
     
@@ -117,7 +112,6 @@ onAuthStateChanged(auth, async (user) => {
 
 document.getElementById('save-profile-btn').addEventListener('click', async () => {
     const user = auth.currentUser; 
-    // Clean name for Ntfy URL compatibility (removes spaces)
     const rawName = document.getElementById('prof-name').value;
     const cleanName = rawName.replace(/[^a-zA-Z0-9]/g, ""); 
     
@@ -152,14 +146,15 @@ function openDirectChat(targetUser) {
 
 async function sendChatMessage() { 
     const input = document.getElementById('chat-input'); const text = input.value; 
-    const prioritySelect = document.getElementById('chat-priority').value; // Read Normal vs Urgent
+    const prioritySelect = document.getElementById('chat-priority').value; 
     if(!text || !currentChatUser) return; 
     input.value = ''; 
     await addDoc(collection(db, "direct_messages"), { chatId: getChatId(auth.currentUser.uid, currentChatUser.uid), text: text, senderId: auth.currentUser.uid, timestamp: serverTimestamp() }); 
     
-    // Ntfy Logic for Chat: Sends to TARGET USER's Personal Channel
-    // Ex: rishav_lab_alerts_2026_Vikash
-    const targetChannelSuffix = currentChatUser.cleanName ? `_${currentChatUser.cleanName}` : "";
+    // BACKWARD COMPATIBILITY: Auto-calculates clean name for older users who haven't re-saved profile
+    const targetCleanName = currentChatUser.cleanName || (currentChatUser.name ? currentChatUser.name.replace(/[^a-zA-Z0-9]/g, "") : "");
+    const targetChannelSuffix = targetCleanName ? `_${targetCleanName}` : "";
+    
     pushToNtfy(`💬 Chat from ${currentUserDoc.name}`, text, prioritySelect, targetChannelSuffix);
 }
 document.getElementById('send-chat-btn').addEventListener('click', sendChatMessage); document.getElementById('chat-input').addEventListener('keypress', (e) => { if(e.key === 'Enter') sendChatMessage(); });
@@ -169,20 +164,21 @@ function setupDashboard(user, profile) {
     document.getElementById('display-name').textContent = profile.name; document.getElementById('display-pic').src = profile.photoURL; document.getElementById('user-status').value = profile.status || "Active";
     document.getElementById('user-status').addEventListener('change', async (e) => { await updateDoc(doc(db, "users", user.uid), { status: e.target.value }); });
 
+    // BACKWARD COMPATIBILITY for Tip Display
+    const mySafeCleanName = profile.cleanName || (profile.name ? profile.name.replace(/[^a-zA-Z0-9]/g, "") : "YourName");
+
     // Load Users
     onSnapshot(collection(db, "users"), (snapshot) => {
-        // Keeps the tip text inside the contact list
-        contactListArea.innerHTML = `<div style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.85rem; color: #a7f3d0;"><i class="fas fa-info-circle"></i> <strong>Tip:</strong> Subscribe to your personal Ntfy channel on your phone to get DMs! (Example: <em>rishav_lab_alerts_2026_${profile.cleanName || 'YourName'}</em>)</div>`; 
+        contactListArea.innerHTML = `<div style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.85rem; color: #a7f3d0;"><i class="fas fa-info-circle"></i> <strong>Tip:</strong> Subscribe to your personal Ntfy channel on your phone to get DMs! (Example: <em>rishav_lab_alerts_2026_${mySafeCleanName}</em>)</div>`; 
         snapshot.forEach(userDoc => { const u = userDoc.data(); if(u.uid !== user.uid) { const contactEl = document.createElement('div'); contactEl.className = 'contact-item'; contactEl.innerHTML = `<img src="${u.photoURL}" onerror="this.src='https://ui-avatars.com/api/?name=${u.name[0]}&background=2563eb&color=fff'"><div><span class="name">${u.name}</span><span class="lab">${u.lab} Lab - ${u.status === 'Active' ? '🟢' : '🔴'}</span></div>`; contactEl.onclick = () => openDirectChat(u); contactListArea.appendChild(contactEl); } });
     });
 
-    // NEW: Load Global Notices
+    // Load Global Notices
     onSnapshot(collection(db, "notices"), (snapshot) => {
         const noticeList = document.getElementById('notice-board-list');
         const notices = [];
         snapshot.forEach(doc => notices.push(doc.data()));
         
-        // Sort newest first
         notices.sort((a, b) => { const tA = a.timestamp ? a.timestamp.toMillis() : Date.now(); const tB = b.timestamp ? b.timestamp.toMillis() : Date.now(); return tB - tA; });
         
         if (notices.length === 0) {
@@ -268,7 +264,7 @@ function setupDashboard(user, profile) {
     });
 }
 
-// === NEW: NOTICE CREATION LOGIC ===
+// === NOTICE CREATION LOGIC ===
 const noticeModal = document.getElementById('notice-modal');
 document.getElementById('open-notice-btn').addEventListener('click', () => noticeModal.style.display = 'flex');
 document.getElementById('close-notice-modal-btn').addEventListener('click', () => noticeModal.style.display = 'none');
@@ -278,20 +274,15 @@ document.getElementById('submit-notice-btn').addEventListener('click', async () 
     const details = document.getElementById('notice-details').value;
     if(!title) { alert("Title is required!"); return; }
 
-    // Save to Database
     await addDoc(collection(db, "notices"), {
         title: title, details: details, senderName: currentUserDoc.name, senderId: auth.currentUser.uid, timestamp: serverTimestamp()
     });
     
-    noticeModal.style.display = 'none'; 
-    document.getElementById('notice-title').value = ''; 
-    document.getElementById('notice-details').value = '';
+    noticeModal.style.display = 'none'; document.getElementById('notice-title').value = ''; document.getElementById('notice-details').value = '';
     showToast("Notice Published!", "fa-bullhorn");
 
-    // Push to MAIN channel at Priority 4 (High)
-    pushToNtfy(`📢 NOTICE: ${title}`, `${details}\n- Posted by ${currentUserDoc.name}`, "4", ""); // Blank suffix = main channel
+    pushToNtfy(`📢 NOTICE: ${title}`, `${details}\n- Posted by ${currentUserDoc.name}`, "4", ""); 
 });
-
 
 // === LAB TASK CREATION ===
 const taskModal = document.getElementById('task-modal');
@@ -312,7 +303,6 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
     logToGoogleSheets(newTask); 
 
     if (alertMethod === "All" || alertMethod === "BothAlerts") {
-        // Push to MAIN channel at Priority 5 (Max)
         pushToNtfy('🚨 NEW LAB TASK', `Task: ${title}\nManager: ${manager}\nTime: ${timeNeeded}`, "5", "");
     }
 
