@@ -16,7 +16,6 @@
         <div class="nav-brand"><i class="fas fa-microscope"></i> LabManager</div>
         <div class="nav-actions">
             <a href="https://ntfy.sh/rishav_lab_alerts_2026" target="_blank" class="icon-btn" title="Open Ntfy Alerts" style="color: #10b981;"><i class="fas fa-satellite-dish"></i></a>
-            
             <button id="install-app-btn" style="display: none; background: #10b981; color: white;" class="btn"><i class="fas fa-download"></i></button>
             <button id="enable-alerts-btn" class="icon-btn" title="Enable Alerts"><i class="fas fa-bell"></i></button>
             <button id="debug-btn" class="icon-btn" title="Open Console"><i class="fas fa-bug"></i></button>
@@ -86,7 +85,6 @@
                 <h3><i class="fas fa-check-circle" style="color:#10b981;"></i> My Lab Tasks</h3>
                 <div id="my-tasks-list" class="task-list"><p class="text-muted">No accepted tasks.</p></div>
             </div>
-            
             <div class="task-column card" style="border-top: 4px solid #8b5cf6;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h3 style="margin: 0;"><i class="fas fa-lock" style="color:#8b5cf6;"></i> My Schedule</h3>
@@ -100,18 +98,21 @@
         <button id="fab-add-task" class="fab" title="Add Lab Task"><i class="fas fa-plus"></i></button>
     </div>
 
-    <div id="chat-panel" class="chat-panel hidden">
-        <div class="chat-header">
+    <div id="chat-panel" class="chat-panel hidden" style="display: flex; flex-direction: column; overflow: hidden;">
+        <div class="chat-header" style="flex-shrink: 0;">
             <div style="display:flex; align-items:center; gap: 10px;">
                 <button id="chat-back-btn" class="icon-btn hidden" style="color:white;"><i class="fas fa-arrow-left"></i></button>
                 <h3 id="chat-panel-title" style="margin:0;"><i class="fas fa-address-book"></i> Contacts</h3>
             </div>
             <button id="close-chat-btn" class="icon-btn" style="color:white;"><i class="fas fa-times"></i></button>
         </div>
-        <div id="chat-contact-list" class="chat-messages"></div>
-        <div id="chat-conversation-area" class="hidden" style="display: flex; flex-direction: column; flex: 1; height: 100%;">
-            <div id="chat-messages" class="chat-messages" style="flex:1;"></div>
-            <div class="chat-input-area">
+        
+        <div id="chat-contact-list" class="chat-messages" style="flex: 1; overflow-y: auto;"></div>
+        
+        <div id="chat-conversation-area" class="hidden" style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
+            <div id="chat-messages" class="chat-messages" style="flex: 1; overflow-y: auto; padding-bottom: 10px;"></div>
+            
+            <div class="chat-input-area" style="display: flex; gap: 10px; padding: 10px; background: #1a1a1a; border-top: 1px solid #333; flex-shrink: 0;">
                 <input type="text" id="chat-input" placeholder="Type a message..." class="input-field" style="margin:0; flex:1;">
                 <button id="send-chat-btn" class="btn primary-btn" style="width: 50px; padding: 10px;"><i class="fas fa-paper-plane"></i></button>
             </div>
@@ -123,18 +124,10 @@
             <h3>Create Lab Task</h3>
             <input type="text" id="task-title" placeholder="Task Title" class="input-field">
             <textarea id="task-details" placeholder="Details & Location" class="input-field" rows="3"></textarea>
-            <input type="text" id="task-time" placeholder="Time Needed (e.g., 2 hours)" class="input-field">
+            <input type="text" id="task-time" placeholder="Time Needed" class="input-field">
             <input type="text" id="task-manager" placeholder="Manager Name" class="input-field">
-            <select id="task-target-lab" class="input-field">
-                <option value="PVL">PVL Only</option>
-                <option value="HET">HET Only</option>
-                <option value="Both">Both</option>
-            </select>
-            <select id="task-assignee" class="input-field">
-                <option value="BothAlerts">🔥 App Flash + Ntfy + WhatsApp</option>
-                <option value="All">App Flash + Ntfy Alert Only</option>
-                <option value="WhatsApp">WhatsApp Forward Only</option>
-            </select>
+            <select id="task-target-lab" class="input-field"><option value="PVL">PVL Only</option><option value="HET">HET Only</option><option value="Both">Both</option></select>
+            <select id="task-assignee" class="input-field"><option value="BothAlerts">🔥 App Flash + Ntfy + WhatsApp</option><option value="All">App Flash + Ntfy Alert Only</option><option value="WhatsApp">WhatsApp Forward Only</option></select>
             <div class="modal-actions">
                 <button id="close-modal-btn" class="btn secondary-btn">Cancel</button>
                 <button id="submit-task-btn" class="btn primary-btn">Publish</button>
@@ -148,20 +141,10 @@
             <p class="text-muted" style="margin-top:0;">Only you can see this.</p>
             <input type="text" id="priv-task-title" placeholder="Task Title" class="input-field">
             <textarea id="priv-task-details" placeholder="Details" class="input-field" rows="2"></textarea>
-            <div style="display:flex; gap:10px;">
-                <input type="date" id="priv-task-date" class="input-field">
-                <input type="time" id="priv-task-time" class="input-field">
-            </div>
+            <div style="display:flex; gap:10px;"><input type="date" id="priv-task-date" class="input-field"><input type="time" id="priv-task-time" class="input-field"></div>
             <label class="input-label">Status:</label>
-            <select id="priv-task-status" class="input-field">
-                <option value="Upcoming">Upcoming</option>
-                <option value="Pending">Pending</option>
-                <option value="Ongoing">Ongoing</option>
-            </select>
-            <div class="modal-actions">
-                <button id="close-priv-modal-btn" class="btn secondary-btn">Cancel</button>
-                <button id="submit-priv-task-btn" class="btn primary-btn" style="background: #8b5cf6;">Save Private</button>
-            </div>
+            <select id="priv-task-status" class="input-field"><option value="Upcoming">Upcoming</option><option value="Pending">Pending</option><option value="Ongoing">Ongoing</option></select>
+            <div class="modal-actions"><button id="close-priv-modal-btn" class="btn secondary-btn">Cancel</button><button id="submit-priv-task-btn" class="btn primary-btn" style="background: #8b5cf6;">Save Private</button></div>
         </div>
     </div>
 
