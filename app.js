@@ -83,15 +83,23 @@ console.log(`✅ Google Sheets URL Loaded.`);
 // ==========================================
 // 🚀 4. NTFY PUSH LOGIC
 // ==========================================
+// ==========================================
+// 🚀 THE "BYPASS BLOCKER" NTFY PUSH LOGIC
+// ==========================================
 function pushToNtfy(alertTitle, alertMessage, isUrgent) {
-    const topicUrl = "https://ntfy.sh/rishav_lab_alerts_2026";
     const priority = isUrgent ? "5" : "4";
     const tags = isUrgent ? "rotating_light,warning" : "speech_balloon";
     
-    console.log(`📡 Attempting Ntfy Push to: rishav_lab_alerts_2026 (Priority: ${priority})`);
+    // THE FIX: We encode the rules directly into the URL to bypass browser CORS blocks!
+    const encodedTitle = encodeURIComponent(alertTitle);
+    const topicUrl = `https://ntfy.sh/rishav_lab_alerts_2026?title=${encodedTitle}&priority=${priority}&tags=${tags}`;
+    
+    console.log(`📡 Attempting Ntfy Push via Query URL...`);
 
     fetch(topicUrl, {
-        method: 'POST', body: alertMessage, headers: { 'Title': alertTitle, 'Priority': priority, 'Tags': tags }
+        method: 'POST',
+        body: alertMessage
+        // Notice: We completely removed the custom 'headers' block here!
     })
     .then(async (response) => {
         if (response.ok) {
@@ -99,15 +107,17 @@ function pushToNtfy(alertTitle, alertMessage, isUrgent) {
             console.log(`✅ Ntfy Success! Delivered: ${alertTitle}`);
         } else {
             const errText = await response.text();
-            alert(`Ntfy Blocked (Error ${response.status}): ${errText}`);
+            alert(`Ntfy Rejected by Server (Error ${response.status}): ${errText}`);
             console.error(`❌ Ntfy Blocked: Status ${response.status} - ${errText}`);
         }
     })
     .catch(err => {
-        alert(`Ntfy Network Failed: Check browser AdBlockers!`);
-        console.error("❌ Ntfy Network Error (Browser Blocked it):", err);
+        alert(`Still blocked! Check your Android Settings > Network > Private DNS (Turn it to Auto or Off)`);
+        console.error("❌ Ntfy Network Error:", err);
     });
 }
+// ==========================================
+
 
 // === GOOGLE SHEETS SYNC LOGIC ===
 async function logToGoogleSheets(taskData) {
