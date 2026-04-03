@@ -22,13 +22,50 @@ let previousTasksState = new Map();
 const GOOGLE_SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbwZofHJ2_XKmrTyw9qFdZmsmYifOdYawaiyed75yZV9JQBjqIRu9Qc8PooetfQSZqU3/exec";
 
 // ==========================================
+// 💻 ADVANCED PERSISTENT CONSOLE LOGIC
+// ==========================================
+const originalLog = console.log;
+const originalError = console.error;
+const debugLog = document.getElementById('debug-log');
+
+// Load old logs if the page refreshed!
+if (sessionStorage.getItem('app_debug_logs') && debugLog) {
+    debugLog.innerHTML = sessionStorage.getItem('app_debug_logs');
+}
+
+function formatMsg(args) {
+    return args.map(arg => {
+        if (arg instanceof Error) return arg.message;
+        if (typeof arg === 'object') {
+            try { return JSON.stringify(arg); } catch(e) { return "[Complex Object]"; }
+        }
+        return String(arg);
+    }).join(' ');
+}
+
+function logToScreen(msg, isError = false) {
+    if(debugLog) { 
+        const color = isError ? '#ff4444' : '#00ff00';
+        debugLog.innerHTML += `<div style="color:${color}; margin-bottom: 4px; border-bottom: 1px solid #222; padding-bottom: 2px;">> ${msg}</div>`; 
+        debugLog.scrollTop = debugLog.scrollHeight; 
+        sessionStorage.setItem('app_debug_logs', debugLog.innerHTML); // Save it so it never wipes!
+    } 
+}
+
+console.log = (...args) => { originalLog(...args); logToScreen(formatMsg(args), false); };
+console.error = (...args) => { originalError(...args); logToScreen(formatMsg(args), true); };
+
+document.getElementById('debug-btn').addEventListener('click', () => document.getElementById('debug-modal').style.display = 'flex');
+document.getElementById('close-debug-btn').addEventListener('click', () => document.getElementById('debug-modal').style.display = 'none');
+document.getElementById('clear-debug-btn').addEventListener('click', () => { debugLog.innerHTML = ''; sessionStorage.removeItem('app_debug_logs'); });
+// ==========================================
+
+
+// ==========================================
 // 🚀 FRESH, CLEAN NTFY PUSH LOGIC
 // ==========================================
 function pushToNtfy(alertTitle, alertMessage, isUrgent) {
-    // Exact topic URL based on your screenshot
     const topicUrl = "https://ntfy.sh/rishav_lab_alerts_2026";
-    
-    // Urgent = Task (Priority 5, Red Light), Not Urgent = Chat (Priority 4, Balloon)
     const priority = isUrgent ? "5" : "4";
     const tags = isUrgent ? "rotating_light,warning" : "speech_balloon";
 
@@ -41,14 +78,20 @@ function pushToNtfy(alertTitle, alertMessage, isUrgent) {
             'Tags': tags
         }
     })
-    .then(response => {
+    .then(async (response) => {
         if (response.ok) {
+            showToast("Ntfy Alert Sent!", "fa-satellite-dish");
             console.log(`✅ Ntfy Success: ${alertTitle}`);
         } else {
-            console.log(`❌ Ntfy Blocked by Browser: Error ${response.status}`);
+            const errText = await response.text();
+            alert(`Ntfy Blocked (Error ${response.status}): ${errText}`);
+            console.error(`❌ Ntfy Blocked: Status ${response.status} - ${errText}`);
         }
     })
-    .catch(err => console.error("❌ Ntfy Network Error:", err));
+    .catch(err => {
+        alert(`Ntfy Network Failed: Your mobile browser is blocking the background push!`);
+        console.error("❌ Ntfy Network Error:", err);
+    });
 }
 // ==========================================
 
@@ -102,13 +145,6 @@ alertBtn.addEventListener('click', async () => {
 const screens = { login: document.getElementById('login-screen'), profile: document.getElementById('profile-screen'), dashboard: document.getElementById('dashboard-screen') };
 function showScreen(screenName) { Object.values(screens).forEach(s => s.classList.remove('active')); screens[screenName].classList.add('active'); }
 
-const debugLog = document.getElementById('debug-log');
-function logToScreen(msg) { if(debugLog) { debugLog.innerHTML += `<div>> ${msg}</div>`; debugLog.scrollTop = debugLog.scrollHeight; } }
-console.log = (...args) => { logToScreen(args.join(' ')); };
-document.getElementById('debug-btn').addEventListener('click', () => document.getElementById('debug-modal').style.display = 'flex');
-document.getElementById('close-debug-btn').addEventListener('click', () => document.getElementById('debug-modal').style.display = 'none');
-document.getElementById('clear-debug-btn').addEventListener('click', () => debugLog.innerHTML = '');
-
 // === AUTHENTICATION & PROFILE ===
 document.getElementById('login-google-btn').addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()));
 window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { 'size': 'normal' });
@@ -120,6 +156,7 @@ onAuthStateChanged(auth, async (user) => {
         const userSnap = await getDoc(doc(db, "users", user.uid));
         if (userSnap.exists()) {
             currentUserDoc = userSnap.data(); setupDashboard(user, currentUserDoc); showScreen('dashboard');
+            console.log("User logged in successfully!");
         } else {
             showScreen('profile');
             if (user.email) { document.getElementById('prof-email').style.display = 'none'; document.getElementById('prof-phone').style.display = 'block'; } 
@@ -166,7 +203,6 @@ async function sendChatMessage() {
     input.value = ''; 
     await addDoc(collection(db, "direct_messages"), { chatId: getChatId(auth.currentUser.uid, currentChatUserId), text: text, senderId: auth.currentUser.uid, timestamp: serverTimestamp() }); 
     
-    // Calls the fresh Ntfy logic (isUrgent = false)
     pushToNtfy(`💬 Chat from ${currentUserDoc.name}`, text, false);
 }
 document.getElementById('send-chat-btn').addEventListener('click', sendChatMessage); document.getElementById('chat-input').addEventListener('keypress', (e) => { if(e.key === 'Enter') sendChatMessage(); });
@@ -283,9 +319,8 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
 
     logToGoogleSheets(newTask); 
 
-    // 🚨 TASKS: Trigger Ntfy
+    // 🚨 TASKS: Trigger Ntfy ONLY if user selects "All" or "BothAlerts"
     if (alertMethod === "All" || alertMethod === "BothAlerts") {
-        // Calls the fresh Ntfy logic (isUrgent = true)
         pushToNtfy('🚨 NEW LAB TASK', `Task: ${title}\nManager: ${manager}\nTime: ${timeNeeded}`, true);
     }
 
