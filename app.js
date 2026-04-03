@@ -21,6 +21,26 @@ let previousTasksState = new Map();
 // === EXTERNAL INTEGRATIONS ===
 const GOOGLE_SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbwZofHJ2_XKmrTyw9qFdZmsmYifOdYawaiyed75yZV9JQBjqIRu9Qc8PooetfQSZqU3/exec";
 const NTFY_AUTH_TOKEN = "Tk_1r6v82p1z3j5n7acv5jso0ksa35lc";
+const NTFY_TOPIC = "rishav_lab_alerts_20"; // Updated to match your screenshot exactly!
+
+// === MASTER NTFY PUSH FUNCTION ===
+async function sendNtfyAlert(title, message, priorityLevel) {
+    try {
+        await fetch(`https://ntfy.sh/${NTFY_TOPIC}`, {
+            method: 'POST',
+            body: message,
+            headers: {
+                'Title': title,
+                'Priority': priorityLevel.toString(), // 5 = Max (Rings loudly), 4 = High
+                'Tags': priorityLevel === 5 ? 'rotating_light,warning' : 'speech_balloon',
+                'Authorization': `Bearer ${NTFY_AUTH_TOKEN}`
+            }
+        });
+        console.log(`Ntfy Push Sent: ${title}`);
+    } catch (e) { 
+        console.error("Ntfy Error:", e); 
+    }
+}
 
 // === GOOGLE SHEETS SYNC LOGIC ===
 async function logToGoogleSheets(taskData) {
@@ -128,7 +148,16 @@ function openDirectChat(targetUser) {
     });
 }
 
-async function sendChatMessage() { const input = document.getElementById('chat-input'); const text = input.value; if(!text || !currentChatUserId) return; input.value = ''; await addDoc(collection(db, "direct_messages"), { chatId: getChatId(auth.currentUser.uid, currentChatUserId), text: text, senderId: auth.currentUser.uid, timestamp: serverTimestamp() }); }
+// 💬 CHAT SENDS NTFY AT PRIORITY 4 (High)
+async function sendChatMessage() { 
+    const input = document.getElementById('chat-input'); const text = input.value; 
+    if(!text || !currentChatUserId) return; 
+    input.value = ''; 
+    await addDoc(collection(db, "direct_messages"), { chatId: getChatId(auth.currentUser.uid, currentChatUserId), text: text, senderId: auth.currentUser.uid, timestamp: serverTimestamp() }); 
+    
+    // Trigger Ntfy for chat!
+    sendNtfyAlert(`💬 Chat from ${currentUserDoc.name}`, text, 4);
+}
 document.getElementById('send-chat-btn').addEventListener('click', sendChatMessage); document.getElementById('chat-input').addEventListener('keypress', (e) => { if(e.key === 'Enter') sendChatMessage(); });
 
 // === DASHBOARD, LAB TASKS, & PRIVATE TASKS ===
@@ -138,13 +167,11 @@ function setupDashboard(user, profile) {
     document.getElementById('user-status').value = profile.status || "Active";
     document.getElementById('user-status').addEventListener('change', async (e) => await updateDoc(doc(db, "users", user.uid), { status: e.target.value }));
 
-    // Load Chat Directory
     onSnapshot(collection(db, "users"), (snapshot) => {
         contactListArea.innerHTML = ''; 
         snapshot.forEach(userDoc => { const u = userDoc.data(); if(u.uid !== user.uid) { const contactEl = document.createElement('div'); contactEl.className = 'contact-item'; contactEl.innerHTML = `<img src="${u.photoURL}" onerror="this.src='https://ui-avatars.com/api/?name=${u.name[0]}&background=2563eb&color=fff'"><div><span class="name">${u.name}</span><span class="lab">${u.lab} Lab - ${u.status === 'Active' ? '🟢' : '🔴'}</span></div>`; contactEl.onclick = () => openDirectChat(u); contactListArea.appendChild(contactEl); } });
     });
 
-    // Load Tasks (Lab AND Private)
     onSnapshot(collection(db, "tasks"), (snapshot) => {
         const openList = document.getElementById('open-tasks-list'); const myList = document.getElementById('my-tasks-list'); const privList = document.getElementById('private-tasks-list');
         openList.innerHTML = ''; myList.innerHTML = ''; privList.innerHTML = '';
@@ -155,7 +182,6 @@ function setupDashboard(user, profile) {
         snapshot.forEach(taskDoc => {
             const task = taskDoc.data(); const taskId = taskDoc.id;
 
-            // Handle Private Tasks First
             if(task.isPrivate) {
                 if(task.ownerId === user.uid) {
                     myPrivCount++;
@@ -176,10 +202,9 @@ function setupDashboard(user, profile) {
                     }
                     privList.appendChild(pEl);
                 }
-                return; // Skip the rest of the lab logic for private tasks
+                return;
             }
 
-            // Standard Lab Task Logic
             if(task.createdBy === user.uid) { statCreated++; if(task.status !== "Pending") statHelped++; }
             if(task.acceptedById === user.uid) statAccepted++;
 
@@ -229,7 +254,7 @@ function setupDashboard(user, profile) {
     });
 }
 
-// === LAB TASK CREATION & SECURE NTFY PUSH ===
+// === LAB TASK CREATION ===
 const taskModal = document.getElementById('task-modal');
 document.getElementById('fab-add-task').addEventListener('click', () => taskModal.style.display = 'flex');
 document.getElementById('close-modal-btn').addEventListener('click', () => taskModal.style.display = 'none');
@@ -247,17 +272,9 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
 
     logToGoogleSheets(newTask); 
 
+    // 🚨 TASKS SEND NTFY AT PRIORITY 5 (Max)
     if (alertMethod === "All" || alertMethod === "BothAlerts") {
-        fetch('https://ntfy.sh/rishav_lab_alerts_2026', {
-            method: 'POST', 
-            body: title, 
-            headers: { 
-                'Title': '🚨 NEW LAB TASK', 
-                'Priority': '5', 
-                'Tags': 'warning',
-                'Authorization': `Bearer ${NTFY_AUTH_TOKEN}`
-            }
-        }).catch(err => console.log("Ntfy error:", err));
+        sendNtfyAlert('🚨 NEW LAB TASK', `Task: ${title}\nManager: ${manager}\nTime: ${timeNeeded}`, 5);
     }
 
     if (alertMethod === "WhatsApp" || alertMethod === "BothAlerts") {
