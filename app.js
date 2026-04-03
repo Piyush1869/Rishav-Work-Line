@@ -3,7 +3,7 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, Recap
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 // ==========================================
-// 💻 1. ADVANCED DIAGNOSTIC CONSOLE
+// 💻 ADVANCED DIAGNOSTIC CONSOLE
 // ==========================================
 const originalLog = console.log;
 const originalError = console.error;
@@ -11,22 +11,8 @@ const debugLog = document.getElementById('debug-log');
 
 if (sessionStorage.getItem('app_debug_logs') && debugLog) { debugLog.innerHTML = sessionStorage.getItem('app_debug_logs'); }
 
-function formatMsg(args) {
-    return args.map(arg => {
-        if (arg instanceof Error) return arg.message;
-        if (typeof arg === 'object') { try { return JSON.stringify(arg); } catch(e) { return "[Object]"; } }
-        return String(arg);
-    }).join(' ');
-}
-
-function logToScreen(msg, isError = false) {
-    if(debugLog) { 
-        const color = isError ? '#ff4444' : '#00ff00';
-        debugLog.innerHTML += `<div style="color:${color}; margin-bottom: 4px; border-bottom: 1px dashed #333; padding-bottom: 2px;">> ${msg}</div>`; 
-        debugLog.scrollTop = debugLog.scrollHeight; 
-        sessionStorage.setItem('app_debug_logs', debugLog.innerHTML);
-    } 
-}
+function formatMsg(args) { return args.map(arg => { if (arg instanceof Error) return arg.message; if (typeof arg === 'object') { try { return JSON.stringify(arg); } catch(e) { return "[Object]"; } } return String(arg); }).join(' '); }
+function logToScreen(msg, isError = false) { if(debugLog) { const color = isError ? '#ff4444' : '#00ff00'; debugLog.innerHTML += `<div style="color:${color}; margin-bottom: 4px; border-bottom: 1px dashed #333; padding-bottom: 2px;">> ${msg}</div>`; debugLog.scrollTop = debugLog.scrollHeight; sessionStorage.setItem('app_debug_logs', debugLog.innerHTML); } }
 
 console.log = (...args) => { originalLog(...args); logToScreen(formatMsg(args), false); };
 console.error = (...args) => { originalError(...args); logToScreen(formatMsg(args), true); };
@@ -35,23 +21,14 @@ document.getElementById('debug-btn').addEventListener('click', () => document.ge
 document.getElementById('close-debug-btn').addEventListener('click', () => document.getElementById('debug-modal').style.display = 'none');
 document.getElementById('clear-debug-btn').addEventListener('click', () => { debugLog.innerHTML = ''; sessionStorage.removeItem('app_debug_logs'); console.log("🗑️ Console Cleared."); });
 
-console.log("🚀 APP STARTING - DIAGNOSTIC MODE ACTIVE");
+// ==========================================
+// 🧹 CACHE KILLER
+// ==========================================
+if ('serviceWorker' in navigator) { navigator.serviceWorker.getRegistrations().then(function(registrations) { for(let registration of registrations) { registration.unregister(); } navigator.serviceWorker.register('/sw.js').catch(e => {}); }); }
+let deferredPrompt; const installBtn = document.getElementById('install-app-btn'); window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'inline-flex'; }); installBtn.addEventListener('click', async () => { if (deferredPrompt) { deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; if (outcome === 'accepted') installBtn.style.display = 'none'; deferredPrompt = null; } });
 
 // ==========================================
-// 🧹 2. THE CACHE KILLER
-// ==========================================
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) { registration.unregister(); }
-        navigator.serviceWorker.register('/sw.js').catch(e => {});
-    });
-}
-let deferredPrompt; const installBtn = document.getElementById('install-app-btn');
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'inline-flex'; });
-installBtn.addEventListener('click', async () => { if (deferredPrompt) { deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; if (outcome === 'accepted') installBtn.style.display = 'none'; deferredPrompt = null; } });
-
-// ==========================================
-// 🔗 3. FIREBASE CONNECTIONS
+// 🔗 FIREBASE CONNECTIONS
 // ==========================================
 const firebaseConfig = {
     apiKey: "AIzaSyC3QMu8G5Q-1Fi8AoB2i3NtlusqjRbFVGg",
@@ -71,36 +48,34 @@ let previousTasksState = new Map();
 const GOOGLE_SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbwZofHJ2_XKmrTyw9qFdZmsmYifOdYawaiyed75yZV9JQBjqIRu9Qc8PooetfQSZqU3/exec";
 
 // ==========================================
-// 🚀 4. NTFY PUSH LOGIC (Bypass Blocker)
+// 🚀 NTFY PUSH LOGIC (Supports Personal Channels & Priorities)
 // ==========================================
-function pushToNtfy(alertTitle, alertMessage, isUrgent) {
-    const priority = isUrgent ? "5" : "4";
-    const tags = isUrgent ? "rotating_light,warning" : "speech_balloon";
+function pushToNtfy(alertTitle, alertMessage, priorityLevel, customTopicSuffix = "") {
+    // 5 = Max (Task), 4 = Urgent Chat/Notice, 3 = Normal Chat, 2 = Low
+    const tags = priorityLevel >= 4 ? "rotating_light,warning" : "speech_balloon";
+    
+    // Core topic + Personal Suffix (if provided)
+    const topicPath = `rishav_lab_alerts_2026${customTopicSuffix}`;
     
     // Encodes Title in URL directly to bypass Browser CORS blocks
     const encodedTitle = encodeURIComponent(alertTitle);
-    const topicUrl = `https://ntfy.sh/rishav_lab_alerts_2026?title=${encodedTitle}&priority=${priority}&tags=${tags}`;
+    const topicUrl = `https://ntfy.sh/${topicPath}?title=${encodedTitle}&priority=${priorityLevel}&tags=${tags}`;
     
-    console.log(`📡 Attempting Ntfy Push...`);
+    console.log(`📡 Pushing to channel: ${topicPath} (Priority: ${priorityLevel})`);
 
     fetch(topicUrl, { method: 'POST', body: alertMessage })
     .then(async (response) => {
         if (response.ok) {
             showToast("Ntfy Alert Sent!", "fa-satellite-dish");
-            console.log(`✅ Ntfy Success! Delivered: ${alertTitle}`);
         } else {
             const errText = await response.text();
-            alert(`Ntfy Server Rejected (Error ${response.status})`);
             console.error(`❌ Ntfy Blocked: Status ${response.status} - ${errText}`);
         }
     })
-    .catch(err => {
-        alert(`Ntfy Network Blocked! Turn off Private DNS/Adblockers.`);
-        console.error("❌ Ntfy Network Error:", err);
-    });
+    .catch(err => console.error("❌ Ntfy Network Error:", err));
 }
 
-// === GOOGLE SHEETS SYNC LOGIC ===
+// === GOOGLE SHEETS SYNC ===
 async function logToGoogleSheets(taskData) {
     if (!GOOGLE_SHEETS_WEBHOOK) return;
     try {
@@ -108,7 +83,6 @@ async function logToGoogleSheets(taskData) {
             method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ userName: currentUserDoc.name, taskName: taskData.title, details: taskData.details || "", status: taskData.status, type: taskData.isPrivate ? "Private Task" : "Lab Task" })
         });
-        console.log("✅ Google Sheets data sent successfully.");
     } catch (e) { console.error("❌ Sheets log failed:", e); }
 }
 
@@ -129,7 +103,7 @@ document.getElementById('verify-otp-btn').addEventListener('click', () => window
 
 onAuthStateChanged(auth, async (user) => {
     if (user) {
-        console.log(`✅ Auth: Logged in (${user.email || user.phoneNumber})`);
+        console.log(`✅ Logged in (${user.email || user.phoneNumber})`);
         const userSnap = await getDoc(doc(db, "users", user.uid));
         if (userSnap.exists()) {
             currentUserDoc = userSnap.data(); setupDashboard(user, currentUserDoc); showScreen('dashboard');
@@ -142,8 +116,12 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 document.getElementById('save-profile-btn').addEventListener('click', async () => {
-    const user = auth.currentUser; const name = document.getElementById('prof-name').value;
-    const profileData = { uid: user.uid, name: name, email: document.getElementById('prof-email').value || user.email, phone: document.getElementById('prof-phone').value || user.phoneNumber, lab: document.getElementById('prof-lab').value, status: "Active", photoURL: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'U')}&background=2563eb&color=fff` };
+    const user = auth.currentUser; 
+    // Clean name for Ntfy URL compatibility (removes spaces)
+    const rawName = document.getElementById('prof-name').value;
+    const cleanName = rawName.replace(/[^a-zA-Z0-9]/g, ""); 
+    
+    const profileData = { uid: user.uid, name: rawName, cleanName: cleanName, email: document.getElementById('prof-email').value || user.email, phone: document.getElementById('prof-phone').value || user.phoneNumber, lab: document.getElementById('prof-lab').value, status: "Active", photoURL: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(rawName || 'U')}&background=2563eb&color=fff` };
     await setDoc(doc(db, "users", user.uid), profileData);
     currentUserDoc = profileData; setupDashboard(user, profileData); showScreen('dashboard'); showToast("Profile Saved!", "fa-user-check");
 });
@@ -151,49 +129,83 @@ document.getElementById('edit-profile-btn').addEventListener('click', () => {
     if (currentUserDoc) { document.getElementById('prof-name').value = currentUserDoc.name || ''; document.getElementById('prof-email').value = currentUserDoc.email || ''; document.getElementById('prof-phone').value = currentUserDoc.phone || ''; document.getElementById('prof-lab').value = currentUserDoc.lab || 'PVL'; document.getElementById('prof-email').style.display = 'block'; document.getElementById('prof-phone').style.display = 'block'; showScreen('profile'); }
 });
 
-// === 1-ON-1 CHAT ===
-let currentChatUserId = null; let chatUnsubscribe = null;
+// === 1-ON-1 CHAT WITH PRIORITIES & PERSONAL CHANNELS ===
+let currentChatUser = null; let chatUnsubscribe = null;
 function getChatId(uid1, uid2) { return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`; }
 const chatPanel = document.getElementById('chat-panel'); const contactListArea = document.getElementById('chat-contact-list'); const conversationArea = document.getElementById('chat-conversation-area'); const chatTitle = document.getElementById('chat-panel-title'); const backBtn = document.getElementById('chat-back-btn');
 document.getElementById('fab-chat').addEventListener('click', () => { chatPanel.classList.remove('hidden'); showContactList(); });
 document.getElementById('close-chat-btn').addEventListener('click', () => chatPanel.classList.add('hidden'));
 backBtn.addEventListener('click', () => showContactList());
 
-function showContactList() { currentChatUserId = null; if(chatUnsubscribe) { chatUnsubscribe(); chatUnsubscribe = null; } backBtn.classList.add('hidden'); chatTitle.innerHTML = `<i class="fas fa-address-book"></i> Contacts`; conversationArea.classList.add('hidden'); contactListArea.classList.remove('hidden'); }
+function showContactList() { currentChatUser = null; if(chatUnsubscribe) { chatUnsubscribe(); chatUnsubscribe = null; } backBtn.classList.add('hidden'); chatTitle.innerHTML = `<i class="fas fa-address-book"></i> Contacts`; conversationArea.classList.add('hidden'); contactListArea.classList.remove('hidden'); }
 
 function openDirectChat(targetUser) { 
-    currentChatUserId = targetUser.uid; backBtn.classList.remove('hidden'); chatTitle.textContent = targetUser.name; contactListArea.classList.add('hidden'); conversationArea.classList.remove('hidden'); const chatId = getChatId(auth.currentUser.uid, targetUser.uid); const chatMessages = document.getElementById('chat-messages'); if(chatUnsubscribe) chatUnsubscribe(); 
+    currentChatUser = targetUser; backBtn.classList.remove('hidden'); chatTitle.textContent = targetUser.name; contactListArea.classList.add('hidden'); conversationArea.classList.remove('hidden'); const chatId = getChatId(auth.currentUser.uid, targetUser.uid); const chatMessages = document.getElementById('chat-messages'); if(chatUnsubscribe) chatUnsubscribe(); 
     chatUnsubscribe = onSnapshot(query(collection(db, "direct_messages"), where("chatId", "==", chatId)), (snapshot) => { 
         const msgs = []; snapshot.forEach(doc => msgs.push(doc.data())); 
         msgs.sort((a, b) => { const timeA = a.timestamp ? a.timestamp.toMillis() : Date.now(); const timeB = b.timestamp ? b.timestamp.toMillis() : Date.now(); return timeA - timeB; }); 
         chatMessages.innerHTML = ''; 
         msgs.forEach(msg => { const isMine = msg.senderId === auth.currentUser.uid; const timeString = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Sending...'; chatMessages.innerHTML += `<div class="chat-msg ${isMine ? 'msg-mine' : 'msg-theirs'}">${msg.text}<span class="time">${timeString}</span></div>`; }); 
-        
-        // Forces scrolling to bottom without pushing input box away
         chatMessages.scrollTop = chatMessages.scrollHeight; 
     });
 }
 
 async function sendChatMessage() { 
     const input = document.getElementById('chat-input'); const text = input.value; 
-    if(!text || !currentChatUserId) return; 
+    const prioritySelect = document.getElementById('chat-priority').value; // Read Normal vs Urgent
+    if(!text || !currentChatUser) return; 
     input.value = ''; 
-    await addDoc(collection(db, "direct_messages"), { chatId: getChatId(auth.currentUser.uid, currentChatUserId), text: text, senderId: auth.currentUser.uid, timestamp: serverTimestamp() }); 
+    await addDoc(collection(db, "direct_messages"), { chatId: getChatId(auth.currentUser.uid, currentChatUser.uid), text: text, senderId: auth.currentUser.uid, timestamp: serverTimestamp() }); 
     
-    pushToNtfy(`💬 Chat from ${currentUserDoc.name}`, text, false);
+    // Ntfy Logic for Chat: Sends to TARGET USER's Personal Channel
+    // Ex: rishav_lab_alerts_2026_Vikash
+    const targetChannelSuffix = currentChatUser.cleanName ? `_${currentChatUser.cleanName}` : "";
+    pushToNtfy(`💬 Chat from ${currentUserDoc.name}`, text, prioritySelect, targetChannelSuffix);
 }
 document.getElementById('send-chat-btn').addEventListener('click', sendChatMessage); document.getElementById('chat-input').addEventListener('keypress', (e) => { if(e.key === 'Enter') sendChatMessage(); });
 
-// === DASHBOARD, LAB TASKS, & PRIVATE TASKS ===
+// === DASHBOARD & TASKS & NOTICES ===
 function setupDashboard(user, profile) {
     document.getElementById('display-name').textContent = profile.name; document.getElementById('display-pic').src = profile.photoURL; document.getElementById('user-status').value = profile.status || "Active";
     document.getElementById('user-status').addEventListener('change', async (e) => { await updateDoc(doc(db, "users", user.uid), { status: e.target.value }); });
 
+    // Load Users
     onSnapshot(collection(db, "users"), (snapshot) => {
-        contactListArea.innerHTML = ''; 
+        // Keeps the tip text inside the contact list
+        contactListArea.innerHTML = `<div style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.85rem; color: #a7f3d0;"><i class="fas fa-info-circle"></i> <strong>Tip:</strong> Subscribe to your personal Ntfy channel on your phone to get DMs! (Example: <em>rishav_lab_alerts_2026_${profile.cleanName || 'YourName'}</em>)</div>`; 
         snapshot.forEach(userDoc => { const u = userDoc.data(); if(u.uid !== user.uid) { const contactEl = document.createElement('div'); contactEl.className = 'contact-item'; contactEl.innerHTML = `<img src="${u.photoURL}" onerror="this.src='https://ui-avatars.com/api/?name=${u.name[0]}&background=2563eb&color=fff'"><div><span class="name">${u.name}</span><span class="lab">${u.lab} Lab - ${u.status === 'Active' ? '🟢' : '🔴'}</span></div>`; contactEl.onclick = () => openDirectChat(u); contactListArea.appendChild(contactEl); } });
     });
 
+    // NEW: Load Global Notices
+    onSnapshot(collection(db, "notices"), (snapshot) => {
+        const noticeList = document.getElementById('notice-board-list');
+        const notices = [];
+        snapshot.forEach(doc => notices.push(doc.data()));
+        
+        // Sort newest first
+        notices.sort((a, b) => { const tA = a.timestamp ? a.timestamp.toMillis() : Date.now(); const tB = b.timestamp ? b.timestamp.toMillis() : Date.now(); return tB - tA; });
+        
+        if (notices.length === 0) {
+            noticeList.innerHTML = '<p class="text-muted">No notices right now.</p>';
+        } else {
+            noticeList.innerHTML = '';
+            notices.forEach(notice => {
+                const timeString = notice.timestamp ? new Date(notice.timestamp.toDate()).toLocaleString([], {month:'short', day:'numeric', hour: '2-digit', minute:'2-digit'}) : 'Just now';
+                noticeList.innerHTML += `
+                    <div style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 10px; border-radius: 4px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom: 5px;">
+                            <strong style="color: #ef4444;">${notice.title}</strong>
+                            <span style="font-size: 0.75rem; color: #aaa;">${timeString}</span>
+                        </div>
+                        <p style="margin: 0; font-size: 0.9rem;">${notice.details}</p>
+                        <div style="margin-top: 5px; font-size: 0.8rem; color: #888;">- Posted by ${notice.senderName}</div>
+                    </div>
+                `;
+            });
+        }
+    });
+
+    // Load Tasks
     onSnapshot(collection(db, "tasks"), (snapshot) => {
         const openList = document.getElementById('open-tasks-list'); const myList = document.getElementById('my-tasks-list'); const privList = document.getElementById('private-tasks-list');
         openList.innerHTML = ''; myList.innerHTML = ''; privList.innerHTML = '';
@@ -256,7 +268,32 @@ function setupDashboard(user, profile) {
     });
 }
 
-/// === LAB TASK CREATION ===
+// === NEW: NOTICE CREATION LOGIC ===
+const noticeModal = document.getElementById('notice-modal');
+document.getElementById('open-notice-btn').addEventListener('click', () => noticeModal.style.display = 'flex');
+document.getElementById('close-notice-modal-btn').addEventListener('click', () => noticeModal.style.display = 'none');
+
+document.getElementById('submit-notice-btn').addEventListener('click', async () => {
+    const title = document.getElementById('notice-title').value;
+    const details = document.getElementById('notice-details').value;
+    if(!title) { alert("Title is required!"); return; }
+
+    // Save to Database
+    await addDoc(collection(db, "notices"), {
+        title: title, details: details, senderName: currentUserDoc.name, senderId: auth.currentUser.uid, timestamp: serverTimestamp()
+    });
+    
+    noticeModal.style.display = 'none'; 
+    document.getElementById('notice-title').value = ''; 
+    document.getElementById('notice-details').value = '';
+    showToast("Notice Published!", "fa-bullhorn");
+
+    // Push to MAIN channel at Priority 4 (High)
+    pushToNtfy(`📢 NOTICE: ${title}`, `${details}\n- Posted by ${currentUserDoc.name}`, "4", ""); // Blank suffix = main channel
+});
+
+
+// === LAB TASK CREATION ===
 const taskModal = document.getElementById('task-modal');
 document.getElementById('fab-add-task').addEventListener('click', () => taskModal.style.display = 'flex');
 document.getElementById('close-modal-btn').addEventListener('click', () => taskModal.style.display = 'none');
@@ -275,7 +312,8 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
     logToGoogleSheets(newTask); 
 
     if (alertMethod === "All" || alertMethod === "BothAlerts") {
-        pushToNtfy('🚨 NEW LAB TASK', `Task: ${title}\nManager: ${manager}\nTime: ${timeNeeded}`, true);
+        // Push to MAIN channel at Priority 5 (Max)
+        pushToNtfy('🚨 NEW LAB TASK', `Task: ${title}\nManager: ${manager}\nTime: ${timeNeeded}`, "5", "");
     }
 
     if (alertMethod === "WhatsApp" || alertMethod === "BothAlerts") {
