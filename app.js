@@ -3,15 +3,13 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, Recap
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 // ==========================================
-// 💻 1. ADVANCED DIAGNOSTIC CONSOLE (MOVED TO TOP)
+// 💻 1. ADVANCED DIAGNOSTIC CONSOLE
 // ==========================================
 const originalLog = console.log;
 const originalError = console.error;
 const debugLog = document.getElementById('debug-log');
 
-if (sessionStorage.getItem('app_debug_logs') && debugLog) {
-    debugLog.innerHTML = sessionStorage.getItem('app_debug_logs');
-}
+if (sessionStorage.getItem('app_debug_logs') && debugLog) { debugLog.innerHTML = sessionStorage.getItem('app_debug_logs'); }
 
 function formatMsg(args) {
     return args.map(arg => {
@@ -40,16 +38,12 @@ document.getElementById('clear-debug-btn').addEventListener('click', () => { deb
 console.log("🚀 APP STARTING - DIAGNOSTIC MODE ACTIVE");
 
 // ==========================================
-// 🧹 2. THE CACHE KILLER (Forces phone to update)
+// 🧹 2. THE CACHE KILLER
 // ==========================================
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) {
-            registration.unregister();
-            console.log("🗑️ CACHE KILLED: Deleted old Service Worker!");
-        }
-        // Register fresh
-        navigator.serviceWorker.register('/sw.js').then(() => console.log("✅ Service Worker Registered.")).catch(e => console.error("SW Error:", e));
+        for(let registration of registrations) { registration.unregister(); }
+        navigator.serviceWorker.register('/sw.js').catch(e => {});
     });
 }
 let deferredPrompt; const installBtn = document.getElementById('install-app-btn');
@@ -71,58 +65,44 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-console.log("✅ Firebase Configured & Connected.");
 
 let currentUserDoc = null;
 let previousTasksState = new Map(); 
-
-// === EXTERNAL INTEGRATIONS ===
 const GOOGLE_SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbwZofHJ2_XKmrTyw9qFdZmsmYifOdYawaiyed75yZV9JQBjqIRu9Qc8PooetfQSZqU3/exec";
-console.log(`✅ Google Sheets URL Loaded.`);
 
 // ==========================================
-// 🚀 4. NTFY PUSH LOGIC
-// ==========================================
-// ==========================================
-// 🚀 THE "BYPASS BLOCKER" NTFY PUSH LOGIC
+// 🚀 4. NTFY PUSH LOGIC (Bypass Blocker)
 // ==========================================
 function pushToNtfy(alertTitle, alertMessage, isUrgent) {
     const priority = isUrgent ? "5" : "4";
     const tags = isUrgent ? "rotating_light,warning" : "speech_balloon";
     
-    // THE FIX: We encode the rules directly into the URL to bypass browser CORS blocks!
+    // Encodes Title in URL directly to bypass Browser CORS blocks
     const encodedTitle = encodeURIComponent(alertTitle);
     const topicUrl = `https://ntfy.sh/rishav_lab_alerts_2026?title=${encodedTitle}&priority=${priority}&tags=${tags}`;
     
-    console.log(`📡 Attempting Ntfy Push via Query URL...`);
+    console.log(`📡 Attempting Ntfy Push...`);
 
-    fetch(topicUrl, {
-        method: 'POST',
-        body: alertMessage
-        // Notice: We completely removed the custom 'headers' block here!
-    })
+    fetch(topicUrl, { method: 'POST', body: alertMessage })
     .then(async (response) => {
         if (response.ok) {
             showToast("Ntfy Alert Sent!", "fa-satellite-dish");
             console.log(`✅ Ntfy Success! Delivered: ${alertTitle}`);
         } else {
             const errText = await response.text();
-            alert(`Ntfy Rejected by Server (Error ${response.status}): ${errText}`);
+            alert(`Ntfy Server Rejected (Error ${response.status})`);
             console.error(`❌ Ntfy Blocked: Status ${response.status} - ${errText}`);
         }
     })
     .catch(err => {
-        alert(`Still blocked! Check your Android Settings > Network > Private DNS (Turn it to Auto or Off)`);
+        alert(`Ntfy Network Blocked! Turn off Private DNS/Adblockers.`);
         console.error("❌ Ntfy Network Error:", err);
     });
 }
-// ==========================================
-
 
 // === GOOGLE SHEETS SYNC LOGIC ===
 async function logToGoogleSheets(taskData) {
     if (!GOOGLE_SHEETS_WEBHOOK) return;
-    console.log(`📡 Sending data to Google Sheets...`);
     try {
         await fetch(GOOGLE_SHEETS_WEBHOOK, {
             method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
@@ -142,28 +122,23 @@ const screens = { login: document.getElementById('login-screen'), profile: docum
 function showScreen(screenName) { Object.values(screens).forEach(s => s.classList.remove('active')); screens[screenName].classList.add('active'); }
 
 // === AUTHENTICATION & PROFILE ===
-document.getElementById('login-google-btn').addEventListener('click', () => { console.log("Attempting Google Login..."); signInWithPopup(auth, new GoogleAuthProvider()); });
+document.getElementById('login-google-btn').addEventListener('click', () => { signInWithPopup(auth, new GoogleAuthProvider()); });
 window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { 'size': 'normal' });
-document.getElementById('send-otp-btn').addEventListener('click', () => { console.log("Attempting Phone OTP..."); signInWithPhoneNumber(auth, document.getElementById('phone-number').value, window.recaptchaVerifier).then((res) => { window.confirmationResult = res; document.getElementById('otp-section').style.display = 'block'; document.getElementById('send-otp-btn').style.display = 'none'; }); });
+document.getElementById('send-otp-btn').addEventListener('click', () => { signInWithPhoneNumber(auth, document.getElementById('phone-number').value, window.recaptchaVerifier).then((res) => { window.confirmationResult = res; document.getElementById('otp-section').style.display = 'block'; document.getElementById('send-otp-btn').style.display = 'none'; }); });
 document.getElementById('verify-otp-btn').addEventListener('click', () => window.confirmationResult.confirm(document.getElementById('otp-code').value));
 
 onAuthStateChanged(auth, async (user) => {
     if (user) {
-        console.log(`✅ Auth: Logged in successfully (${user.email || user.phoneNumber})`);
+        console.log(`✅ Auth: Logged in (${user.email || user.phoneNumber})`);
         const userSnap = await getDoc(doc(db, "users", user.uid));
         if (userSnap.exists()) {
-            console.log("✅ Profile Data Found.");
             currentUserDoc = userSnap.data(); setupDashboard(user, currentUserDoc); showScreen('dashboard');
         } else {
-            console.log("⚠️ No Profile Data. Showing profile setup screen.");
             showScreen('profile');
             if (user.email) { document.getElementById('prof-email').style.display = 'none'; document.getElementById('prof-phone').style.display = 'block'; } 
             else { document.getElementById('prof-phone').style.display = 'none'; document.getElementById('prof-email').style.display = 'block'; }
         }
-    } else { 
-        console.log("⚠️ Auth: No user logged in.");
-        showScreen('login'); 
-    }
+    } else { showScreen('login'); }
 });
 
 document.getElementById('save-profile-btn').addEventListener('click', async () => {
@@ -171,7 +146,6 @@ document.getElementById('save-profile-btn').addEventListener('click', async () =
     const profileData = { uid: user.uid, name: name, email: document.getElementById('prof-email').value || user.email, phone: document.getElementById('prof-phone').value || user.phoneNumber, lab: document.getElementById('prof-lab').value, status: "Active", photoURL: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'U')}&background=2563eb&color=fff` };
     await setDoc(doc(db, "users", user.uid), profileData);
     currentUserDoc = profileData; setupDashboard(user, profileData); showScreen('dashboard'); showToast("Profile Saved!", "fa-user-check");
-    console.log("✅ Profile Saved to Firestore.");
 });
 document.getElementById('edit-profile-btn').addEventListener('click', () => {
     if (currentUserDoc) { document.getElementById('prof-name').value = currentUserDoc.name || ''; document.getElementById('prof-email').value = currentUserDoc.email || ''; document.getElementById('prof-phone').value = currentUserDoc.phone || ''; document.getElementById('prof-lab').value = currentUserDoc.lab || 'PVL'; document.getElementById('prof-email').style.display = 'block'; document.getElementById('prof-phone').style.display = 'block'; showScreen('profile'); }
@@ -188,13 +162,14 @@ backBtn.addEventListener('click', () => showContactList());
 function showContactList() { currentChatUserId = null; if(chatUnsubscribe) { chatUnsubscribe(); chatUnsubscribe = null; } backBtn.classList.add('hidden'); chatTitle.innerHTML = `<i class="fas fa-address-book"></i> Contacts`; conversationArea.classList.add('hidden'); contactListArea.classList.remove('hidden'); }
 
 function openDirectChat(targetUser) { 
-    console.log(`💬 Opening chat with: ${targetUser.name}`);
     currentChatUserId = targetUser.uid; backBtn.classList.remove('hidden'); chatTitle.textContent = targetUser.name; contactListArea.classList.add('hidden'); conversationArea.classList.remove('hidden'); const chatId = getChatId(auth.currentUser.uid, targetUser.uid); const chatMessages = document.getElementById('chat-messages'); if(chatUnsubscribe) chatUnsubscribe(); 
     chatUnsubscribe = onSnapshot(query(collection(db, "direct_messages"), where("chatId", "==", chatId)), (snapshot) => { 
         const msgs = []; snapshot.forEach(doc => msgs.push(doc.data())); 
         msgs.sort((a, b) => { const timeA = a.timestamp ? a.timestamp.toMillis() : Date.now(); const timeB = b.timestamp ? b.timestamp.toMillis() : Date.now(); return timeA - timeB; }); 
         chatMessages.innerHTML = ''; 
         msgs.forEach(msg => { const isMine = msg.senderId === auth.currentUser.uid; const timeString = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Sending...'; chatMessages.innerHTML += `<div class="chat-msg ${isMine ? 'msg-mine' : 'msg-theirs'}">${msg.text}<span class="time">${timeString}</span></div>`; }); 
+        
+        // Forces scrolling to bottom without pushing input box away
         chatMessages.scrollTop = chatMessages.scrollHeight; 
     });
 }
@@ -203,7 +178,6 @@ async function sendChatMessage() {
     const input = document.getElementById('chat-input'); const text = input.value; 
     if(!text || !currentChatUserId) return; 
     input.value = ''; 
-    console.log("💬 Sending Chat Message to Firestore...");
     await addDoc(collection(db, "direct_messages"), { chatId: getChatId(auth.currentUser.uid, currentChatUserId), text: text, senderId: auth.currentUser.uid, timestamp: serverTimestamp() }); 
     
     pushToNtfy(`💬 Chat from ${currentUserDoc.name}`, text, false);
@@ -212,9 +186,8 @@ document.getElementById('send-chat-btn').addEventListener('click', sendChatMessa
 
 // === DASHBOARD, LAB TASKS, & PRIVATE TASKS ===
 function setupDashboard(user, profile) {
-    console.log("✅ Loading Dashboard Data...");
     document.getElementById('display-name').textContent = profile.name; document.getElementById('display-pic').src = profile.photoURL; document.getElementById('user-status').value = profile.status || "Active";
-    document.getElementById('user-status').addEventListener('change', async (e) => { console.log(`Status changed to ${e.target.value}`); await updateDoc(doc(db, "users", user.uid), { status: e.target.value }); });
+    document.getElementById('user-status').addEventListener('change', async (e) => { await updateDoc(doc(db, "users", user.uid), { status: e.target.value }); });
 
     onSnapshot(collection(db, "users"), (snapshot) => {
         contactListArea.innerHTML = ''; 
@@ -283,7 +256,7 @@ function setupDashboard(user, profile) {
     });
 }
 
-// === LAB TASK CREATION ===
+/// === LAB TASK CREATION ===
 const taskModal = document.getElementById('task-modal');
 document.getElementById('fab-add-task').addEventListener('click', () => taskModal.style.display = 'flex');
 document.getElementById('close-modal-btn').addEventListener('click', () => taskModal.style.display = 'none');
@@ -294,8 +267,6 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
     const alertMethod = document.getElementById('task-assignee').value;
     if(!title) { alert("Title is required!"); return; }
     
-    console.log(`📝 Creating Lab Task: ${title} (Alert: ${alertMethod})`);
-
     const newTask = { title: title, details: details, timeNeeded: timeNeeded, manager: manager, targetLab: document.getElementById('task-target-lab').value, assignedTo: alertMethod, status: "Pending", createdBy: auth.currentUser.uid, isPrivate: false, timestamp: serverTimestamp() };
     await addDoc(collection(db, "tasks"), newTask);
     taskModal.style.display = 'none'; document.getElementById('task-title').value = ''; document.getElementById('task-details').value = '';
@@ -320,8 +291,6 @@ document.getElementById('close-priv-modal-btn').addEventListener('click', () => 
 document.getElementById('submit-priv-task-btn').addEventListener('click', async () => {
     const title = document.getElementById('priv-task-title').value;
     if(!title) { alert("Title is required!"); return; }
-
-    console.log(`🔒 Creating Private Task: ${title}`);
 
     const newTask = {
         title: title, details: document.getElementById('priv-task-details').value,
