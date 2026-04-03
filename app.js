@@ -20,30 +20,38 @@ let previousTasksState = new Map();
 
 // === EXTERNAL INTEGRATIONS ===
 const GOOGLE_SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbwZofHJ2_XKmrTyw9qFdZmsmYifOdYawaiyed75yZV9JQBjqIRu9Qc8PooetfQSZqU3/exec";
-const NTFY_TOPIC = "rishav_lab_alerts_2026";
 
-// === MASTER NTFY PUSH FUNCTION (Fixed Auth Issue) ===
-async function sendNtfyAlert(title, message, priorityLevel) {
-    try {
-        const response = await fetch(`https://ntfy.sh/${NTFY_TOPIC}`, {
-            method: 'POST',
-            body: message,
-            headers: {
-                'Title': title,
-                'Priority': priorityLevel.toString(), // 5 = Max, 4 = High
-                'Tags': priorityLevel === 5 ? 'rotating_light,warning' : 'speech_balloon'
-            }
-        });
-        
-        if (!response.ok) {
-            console.log(`Ntfy Blocked: Error ${response.status}`);
-        } else {
-            console.log(`Ntfy Push Sent: ${title}`);
+// ==========================================
+// 🚀 FRESH, CLEAN NTFY PUSH LOGIC
+// ==========================================
+function pushToNtfy(alertTitle, alertMessage, isUrgent) {
+    // Exact topic URL based on your screenshot
+    const topicUrl = "https://ntfy.sh/rishav_lab_alerts_2026";
+    
+    // Urgent = Task (Priority 5, Red Light), Not Urgent = Chat (Priority 4, Balloon)
+    const priority = isUrgent ? "5" : "4";
+    const tags = isUrgent ? "rotating_light,warning" : "speech_balloon";
+
+    fetch(topicUrl, {
+        method: 'POST',
+        body: alertMessage,
+        headers: {
+            'Title': alertTitle,
+            'Priority': priority,
+            'Tags': tags
         }
-    } catch (e) { 
-        console.error("Ntfy Failed:", e.message); 
-    }
+    })
+    .then(response => {
+        if (response.ok) {
+            console.log(`✅ Ntfy Success: ${alertTitle}`);
+        } else {
+            console.log(`❌ Ntfy Blocked by Browser: Error ${response.status}`);
+        }
+    })
+    .catch(err => console.error("❌ Ntfy Network Error:", err));
 }
+// ==========================================
+
 
 // === GOOGLE SHEETS SYNC LOGIC ===
 async function logToGoogleSheets(taskData) {
@@ -61,7 +69,7 @@ async function logToGoogleSheets(taskData) {
                 type: taskData.isPrivate ? "Private Task" : "Lab Task"
             })
         });
-        console.log("Logged to Google Sheets successfully");
+        console.log("✅ Sheets log successful");
     } catch (e) { console.error("Sheets log failed:", e); }
 }
 
@@ -151,15 +159,15 @@ function openDirectChat(targetUser) {
     });
 }
 
-// 💬 CHAT SENDS NTFY AT PRIORITY 4 (High)
+// 💬 CHAT: Trigger Ntfy
 async function sendChatMessage() { 
     const input = document.getElementById('chat-input'); const text = input.value; 
     if(!text || !currentChatUserId) return; 
     input.value = ''; 
     await addDoc(collection(db, "direct_messages"), { chatId: getChatId(auth.currentUser.uid, currentChatUserId), text: text, senderId: auth.currentUser.uid, timestamp: serverTimestamp() }); 
     
-    // Trigger Ntfy for chat!
-    sendNtfyAlert(`💬 Chat from ${currentUserDoc.name}`, text, 4);
+    // Calls the fresh Ntfy logic (isUrgent = false)
+    pushToNtfy(`💬 Chat from ${currentUserDoc.name}`, text, false);
 }
 document.getElementById('send-chat-btn').addEventListener('click', sendChatMessage); document.getElementById('chat-input').addEventListener('keypress', (e) => { if(e.key === 'Enter') sendChatMessage(); });
 
@@ -275,9 +283,10 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
 
     logToGoogleSheets(newTask); 
 
-    // 🚨 TASKS SEND NTFY AT PRIORITY 5 (Max)
+    // 🚨 TASKS: Trigger Ntfy
     if (alertMethod === "All" || alertMethod === "BothAlerts") {
-        sendNtfyAlert('🚨 NEW LAB TASK', `Task: ${title}\nManager: ${manager}\nTime: ${timeNeeded}`, 5);
+        // Calls the fresh Ntfy logic (isUrgent = true)
+        pushToNtfy('🚨 NEW LAB TASK', `Task: ${title}\nManager: ${manager}\nTime: ${timeNeeded}`, true);
     }
 
     if (alertMethod === "WhatsApp" || alertMethod === "BothAlerts") {
