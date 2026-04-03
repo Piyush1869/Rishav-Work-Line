@@ -20,7 +20,7 @@ let previousTasksState = new Map();
 
 // === EXTERNAL INTEGRATIONS ===
 const GOOGLE_SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbwZofHJ2_XKmrTyw9qFdZmsmYifOdYawaiyed75yZV9JQBjqIRu9Qc8PooetfQSZqU3/exec";
-const NTFY_TOPIC = "rishav_lab_alerts_20";
+const NTFY_TOPIC = "rishav_lab_alerts_2026";
 
 // === MASTER NTFY PUSH FUNCTION (Fixed Auth Issue) ===
 async function sendNtfyAlert(title, message, priorityLevel) {
