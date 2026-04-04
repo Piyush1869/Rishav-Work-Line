@@ -35,19 +35,35 @@ document.getElementById('close-debug-btn').addEventListener('click', () => docum
 document.getElementById('clear-debug-btn').addEventListener('click', () => { debugLog.innerHTML = ''; sessionStorage.removeItem('app_debug_logs'); console.log("🗑️ Console Cleared."); });
 
 // ==========================================
-// 🛠️ PWA INSTALL LOGIC (FIXED)
+// 🛠️ PWA INSTALL LOGIC (RESTORED TO WORKING STATE)
 // ==========================================
 if ('serviceWorker' in navigator) { 
-    navigator.serviceWorker.register('/sw.js').then(reg => {
-        reg.update(); // Gently checks for updates without destroying the SW!
+    navigator.serviceWorker.register('/sw.js').then(() => {
+        console.log("✅ Service Worker Registered Successfully");
     }).catch(e => console.error("SW Error:", e)); 
 }
-let deferredPrompt; const installBtn = document.getElementById('install-app-btn'); 
+
+let deferredPrompt; 
+const installBtn = document.getElementById('install-app-btn'); 
+
 window.addEventListener('beforeinstallprompt', (e) => { 
-    e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'inline-flex'; 
-    console.log("✅ Ready to install! Download button shown.");
+    console.log("✅ Chrome allowed installation! Showing button.");
+    e.preventDefault(); 
+    deferredPrompt = e; 
+    installBtn.style.display = 'inline-flex'; 
 }); 
-installBtn.addEventListener('click', async () => { if (deferredPrompt) { deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; if (outcome === 'accepted') installBtn.style.display = 'none'; deferredPrompt = null; } });
+
+installBtn.addEventListener('click', async () => { 
+    if (deferredPrompt) { 
+        deferredPrompt.prompt(); 
+        const { outcome } = await deferredPrompt.userChoice; 
+        if (outcome === 'accepted') {
+            installBtn.style.display = 'none'; 
+            console.log("✅ App Installed Successfully!");
+        }
+        deferredPrompt = null; 
+    } 
+});
 
 // ==========================================
 // 🔗 FIREBASE CONNECTIONS
