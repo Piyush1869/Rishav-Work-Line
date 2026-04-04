@@ -3,16 +3,15 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, Recap
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 // ==========================================
-// 🎨 SPLASH SCREEN LOGIC (Fades out the opening page)
+// 🎨 SPLASH SCREEN LOGIC
 // ==========================================
-window.addEventListener('load', () => {
+document.addEventListener("DOMContentLoaded", () => {
     const splash = document.getElementById('splash-screen');
     if (splash) {
-        // Show for 2.5 seconds, then smoothly fade away
         setTimeout(() => {
             splash.style.opacity = '0';
-            setTimeout(() => splash.style.display = 'none', 800);
-        }, 2500); 
+            setTimeout(() => splash.style.display = 'none', 600);
+        }, 1500); 
     }
 });
 
@@ -36,10 +35,19 @@ document.getElementById('close-debug-btn').addEventListener('click', () => docum
 document.getElementById('clear-debug-btn').addEventListener('click', () => { debugLog.innerHTML = ''; sessionStorage.removeItem('app_debug_logs'); console.log("🗑️ Console Cleared."); });
 
 // ==========================================
-// 🧹 CACHE KILLER
+// 🛠️ PWA INSTALL LOGIC (FIXED)
 // ==========================================
-if ('serviceWorker' in navigator) { navigator.serviceWorker.getRegistrations().then(function(registrations) { for(let registration of registrations) { registration.unregister(); } navigator.serviceWorker.register('/sw.js').catch(e => {}); }); }
-let deferredPrompt; const installBtn = document.getElementById('install-app-btn'); window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'inline-flex'; }); installBtn.addEventListener('click', async () => { if (deferredPrompt) { deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; if (outcome === 'accepted') installBtn.style.display = 'none'; deferredPrompt = null; } });
+if ('serviceWorker' in navigator) { 
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+        reg.update(); // Gently checks for updates without destroying the SW!
+    }).catch(e => console.error("SW Error:", e)); 
+}
+let deferredPrompt; const installBtn = document.getElementById('install-app-btn'); 
+window.addEventListener('beforeinstallprompt', (e) => { 
+    e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'inline-flex'; 
+    console.log("✅ Ready to install! Download button shown.");
+}); 
+installBtn.addEventListener('click', async () => { if (deferredPrompt) { deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; if (outcome === 'accepted') installBtn.style.display = 'none'; deferredPrompt = null; } });
 
 // ==========================================
 // 🔗 FIREBASE CONNECTIONS
@@ -124,7 +132,6 @@ onAuthStateChanged(auth, async (user) => {
     } else { showScreen('login'); }
 });
 
-// Copy Button Logic for Profile
 document.getElementById('copy-ntfy-btn').addEventListener('click', () => {
     const copyText = document.getElementById('prof-ntfy-id');
     copyText.select();
@@ -185,23 +192,19 @@ function setupDashboard(user, profile) {
     document.getElementById('display-name').textContent = profile.name; document.getElementById('display-pic').src = profile.photoURL; document.getElementById('user-status').value = profile.status || "Active";
     document.getElementById('user-status').addEventListener('change', async (e) => { await updateDoc(doc(db, "users", user.uid), { status: e.target.value }); });
 
-    // === VISIBILITY & SUBSCRIPTION LOGIC ===
     const mySafeCleanName = profile.cleanName || (profile.name ? profile.name.replace(/[^a-zA-Z0-9]/g, "") : "YourName");
     const myPersonalChannel = `rishav_lab_alerts_2026_${mySafeCleanName}`;
     
     console.log(`📡 Your Personal Ntfy Channel is: ${myPersonalChannel}`);
     
-    // Update Profile UI with personal channel
     const profNtfyId = document.getElementById('prof-ntfy-id');
     if (profNtfyId) profNtfyId.value = myPersonalChannel;
 
-    // Load Users
     onSnapshot(collection(db, "users"), (snapshot) => {
         contactListArea.innerHTML = `<div style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.85rem; color: #a7f3d0;"><i class="fas fa-info-circle"></i> <strong>Tip:</strong> Subscribe to your personal Ntfy channel on your phone to get DMs! (Example: <em>rishav_lab_alerts_2026_${mySafeCleanName}</em>)</div>`; 
         snapshot.forEach(userDoc => { const u = userDoc.data(); if(u.uid !== user.uid) { const contactEl = document.createElement('div'); contactEl.className = 'contact-item'; contactEl.innerHTML = `<img src="${u.photoURL}" onerror="this.src='https://ui-avatars.com/api/?name=${u.name[0]}&background=2563eb&color=fff'"><div><span class="name">${u.name}</span><span class="lab">${u.lab} Lab - ${u.status === 'Active' ? '🟢' : '🔴'}</span></div>`; contactEl.onclick = () => openDirectChat(u); contactListArea.appendChild(contactEl); } });
     });
 
-    // Load Global Notices
     onSnapshot(collection(db, "notices"), (snapshot) => {
         const noticeList = document.getElementById('notice-board-list');
         const notices = [];
@@ -229,7 +232,6 @@ function setupDashboard(user, profile) {
         }
     });
 
-    // Load Tasks
     onSnapshot(collection(db, "tasks"), (snapshot) => {
         const openList = document.getElementById('open-tasks-list'); const myList = document.getElementById('my-tasks-list'); const privList = document.getElementById('private-tasks-list');
         openList.innerHTML = ''; myList.innerHTML = ''; privList.innerHTML = '';
@@ -292,7 +294,6 @@ function setupDashboard(user, profile) {
     });
 }
 
-// === NOTICE CREATION LOGIC ===
 const noticeModal = document.getElementById('notice-modal');
 document.getElementById('open-notice-btn').addEventListener('click', () => noticeModal.style.display = 'flex');
 document.getElementById('close-notice-modal-btn').addEventListener('click', () => noticeModal.style.display = 'none');
@@ -312,7 +313,6 @@ document.getElementById('submit-notice-btn').addEventListener('click', async () 
     pushToNtfy(`📢 NOTICE: ${title}`, `${details}\n- Posted by ${currentUserDoc.name}`, "4", ""); 
 });
 
-// === LAB TASK CREATION ===
 const taskModal = document.getElementById('task-modal');
 document.getElementById('fab-add-task').addEventListener('click', () => taskModal.style.display = 'flex');
 document.getElementById('close-modal-btn').addEventListener('click', () => taskModal.style.display = 'none');
@@ -339,7 +339,6 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
     }
 });
 
-// === PRIVATE TASK CREATION ===
 const privModal = document.getElementById('private-task-modal');
 document.getElementById('inline-add-priv-btn').addEventListener('click', () => privModal.style.display = 'flex');
 document.getElementById('close-priv-modal-btn').addEventListener('click', () => privModal.style.display = 'none');
