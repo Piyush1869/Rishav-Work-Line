@@ -9,15 +9,15 @@
     {
       "src": "https://i.postimg.cc/gr2qQHT6/Logo.png",
       "sizes": "any",
-      "type": "image/png"
+      "type": "image/svg+xml"
     },
     {
-      "src": "https://i.postimg.cc/gr2qQHT6/Logo.png",
+      "src": "https://via.placeholder.com/192.png?text=Lab",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://i.postimg.cc/ZRfqjPpw/opening-page.png",
+      "src": "https://via.placeholder.com/512.png?text=Lab",
       "sizes": "512x512",
       "type": "image/png"
     }
