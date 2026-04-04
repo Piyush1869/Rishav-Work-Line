@@ -7,17 +7,17 @@
   "theme_color": "#3b82f6",
   "icons": [
     {
-      "src": "https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg",
+      "src": "https://i.postimg.cc/gr2qQHT6/Logo.png",
       "sizes": "any",
-      "type": "image/svg+xml"
+      "type": "image/png"
     },
     {
-      "src": "https://via.placeholder.com/192.png?text=Lab",
+      "src": "https://i.postimg.cc/gr2qQHT6/Logo.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://via.placeholder.com/512.png?text=Lab",
+      "src": "https://i.postimg.cc/ZRfqjPpw/opening-page.png",
       "sizes": "512x512",
       "type": "image/png"
     }
