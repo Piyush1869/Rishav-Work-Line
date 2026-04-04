@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lab Task Manager</title>
+    <title>Task Flow</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -13,7 +13,7 @@
     <audio id="task-alarm" loop src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
     <nav class="top-nav">
-        <div class="nav-brand"><i class="fas fa-microscope"></i> LabManager</div>
+        <div class="nav-brand"><i class="fas fa-microscope"></i> Task Flow</div>
         <div class="nav-actions">
             <a id="nav-ntfy-link" href="https://ntfy.sh/rishav_lab_alerts_2026" target="_blank" class="icon-btn" title="Open Ntfy Alerts" style="color: #10b981;"><i class="fas fa-satellite-dish"></i></a>
             <button id="install-app-btn" style="display: none; background: #10b981; color: white;" class="btn"><i class="fas fa-download"></i></button>
@@ -23,8 +23,11 @@
     </nav>
 
     <div id="login-screen" class="screen active">
-        <div class="card login-card">
-            <h2>Welcome Back</h2>
+        <div class="card login-card" style="text-align: center;">
+            
+            <img src="Logo.png" alt="Task Flow Logo" style="width: 100%; max-width: 280px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+            
+            <h2 style="margin-top: 0;">Welcome Back</h2>
             <button id="login-google-btn" class="btn primary-btn"><i class="fab fa-google"></i> Login with Google</button>
             <div class="divider"><span>OR</span></div>
             <input type="tel" id="phone-number" placeholder="+91 98765 43210" class="input-field">
