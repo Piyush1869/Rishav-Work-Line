@@ -3,6 +3,20 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, Recap
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 // ==========================================
+// 🎨 SPLASH SCREEN LOGIC (Fades out the opening page)
+// ==========================================
+window.addEventListener('load', () => {
+    const splash = document.getElementById('splash-screen');
+    if (splash) {
+        // Show for 2.5 seconds, then smoothly fade away
+        setTimeout(() => {
+            splash.style.opacity = '0';
+            setTimeout(() => splash.style.display = 'none', 800);
+        }, 2500); 
+    }
+});
+
+// ==========================================
 // 💻 ADVANCED DIAGNOSTIC CONSOLE
 // ==========================================
 const originalLog = console.log;
@@ -177,12 +191,9 @@ function setupDashboard(user, profile) {
     
     console.log(`📡 Your Personal Ntfy Channel is: ${myPersonalChannel}`);
     
-    // 1. Update Profile UI
+    // Update Profile UI with personal channel
     const profNtfyId = document.getElementById('prof-ntfy-id');
     if (profNtfyId) profNtfyId.value = myPersonalChannel;
-
-    // NOTE: Removed the comma trick for the top-nav icon because Ntfy's website throws a 404. 
-    // It will gracefully fall back to the main channel link established in index.html!
 
     // Load Users
     onSnapshot(collection(db, "users"), (snapshot) => {
