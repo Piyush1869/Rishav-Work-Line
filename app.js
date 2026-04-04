@@ -171,7 +171,7 @@ function setupDashboard(user, profile) {
     document.getElementById('display-name').textContent = profile.name; document.getElementById('display-pic').src = profile.photoURL; document.getElementById('user-status').value = profile.status || "Active";
     document.getElementById('user-status').addEventListener('change', async (e) => { await updateDoc(doc(db, "users", user.uid), { status: e.target.value }); });
 
-    // === NEW: VISIBILITY & SUBSCRIPTION LOGIC ===
+    // === VISIBILITY & SUBSCRIPTION LOGIC ===
     const mySafeCleanName = profile.cleanName || (profile.name ? profile.name.replace(/[^a-zA-Z0-9]/g, "") : "YourName");
     const myPersonalChannel = `rishav_lab_alerts_2026_${mySafeCleanName}`;
     
@@ -181,13 +181,12 @@ function setupDashboard(user, profile) {
     const profNtfyId = document.getElementById('prof-ntfy-id');
     if (profNtfyId) profNtfyId.value = myPersonalChannel;
 
-    // 2. Update Top Nav Shortcut (Comma separates them so BOTH open at once!)
-    const navNtfyLink = document.getElementById('nav-ntfy-link');
-    if (navNtfyLink) navNtfyLink.href = `https://ntfy.sh/rishav_lab_alerts_2026,${myPersonalChannel}`;
-
+    // NOTE: Removed the comma trick for the top-nav icon because Ntfy's website throws a 404. 
+    // It will gracefully fall back to the main channel link established in index.html!
 
     // Load Users
     onSnapshot(collection(db, "users"), (snapshot) => {
+        contactListArea.innerHTML = `<div style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.85rem; color: #a7f3d0;"><i class="fas fa-info-circle"></i> <strong>Tip:</strong> Subscribe to your personal Ntfy channel on your phone to get DMs! (Example: <em>rishav_lab_alerts_2026_${mySafeCleanName}</em>)</div>`; 
         snapshot.forEach(userDoc => { const u = userDoc.data(); if(u.uid !== user.uid) { const contactEl = document.createElement('div'); contactEl.className = 'contact-item'; contactEl.innerHTML = `<img src="${u.photoURL}" onerror="this.src='https://ui-avatars.com/api/?name=${u.name[0]}&background=2563eb&color=fff'"><div><span class="name">${u.name}</span><span class="lab">${u.lab} Lab - ${u.status === 'Active' ? '🟢' : '🔴'}</span></div>`; contactEl.onclick = () => openDirectChat(u); contactListArea.appendChild(contactEl); } });
     });
 
