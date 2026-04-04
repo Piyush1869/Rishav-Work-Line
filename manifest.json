@@ -7,7 +7,7 @@
   "theme_color": "#3b82f6",
   "icons": [
     {
-      "src": "https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg",
+      "src": "Logo.svg",
       "sizes": "any",
       "type": "image/svg+xml"
     },
