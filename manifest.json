@@ -1,11 +1,16 @@
 {
   "name": "Lab Workflow Manager",
   "short_name": "LabManager",
-  "start_url": "/",
+  "start_url": "/index.html",
   "display": "standalone",
   "background_color": "#121212",
   "theme_color": "#3b82f6",
   "icons": [
+    {
+      "src": "https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
     {
       "src": "https://via.placeholder.com/192.png?text=Lab",
       "sizes": "192x192",
@@ -17,3 +22,4 @@
       "type": "image/png"
     }
   ]
+}
