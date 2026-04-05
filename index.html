@@ -16,11 +16,8 @@
         <div class="nav-brand"><i class="fas fa-microscope"></i> Task Flow</div>
         <div class="nav-actions">
             <a id="nav-ntfy-link" href="https://ntfy.sh/rishav_lab_alerts_2026" target="_blank" class="icon-btn" title="Open Ntfy Alerts" style="color: #10b981;"><i class="fas fa-satellite-dish"></i></a>
-<a  href="https://docs.google.com/spreadsheets/d/15Ek-qbxPR199SrMUttLAu9xyg922_ZpBzAKKCA9pYys/edit?usp=drivesdk" target="_blank" class="icon-btn" title="task sheet " style="color: #10b98;"><i class="fa-solid fa-file-lines"></i></a>
-
-
-<a   href="https://script.google.com/macros/s/AKfycbzBF6jnX1ftdhGaz-jklZRdOOT8Z91sgfAUdWAXY_eifN2khn4JqouBDGGd8IMg_wXdEg/exec" target="_blank" class="icon-btn" title="Open Ntfy Alerts" style="color: #10b981;"><i class="fa-solid fa-clipboard-check"></i></a>
-
+            <a href="https://docs.google.com/spreadsheets/d/15Ek-qbxPR199SrMUttLAu9xyg922_ZpBzAKKCA9pYys/edit?usp=drivesdk" target="_blank" class="icon-btn" title="Task Sheet" style="color: #10b981;"><i class="fa-solid fa-file-lines"></i></a>
+            <a href="https://script.google.com/macros/s/AKfycbzBF6jnX1ftdhGaz-jklZRdOOT8Z91sgfAUdWAXY_eifN2khn4JqouBDGGd8IMg_wXdEg/exec" target="_blank" class="icon-btn" title="Open Ntfy Alerts" style="color: #10b981;"><i class="fa-solid fa-clipboard-check"></i></a>
             <button id="install-app-btn" style="display: none; background: #10b981; color: white;" class="btn"><i class="fas fa-download"></i></button>
             <button id="enable-alerts-btn" class="icon-btn" title="Enable Alerts"><i class="fas fa-bell"></i></button>
             <button id="debug-btn" class="icon-btn" title="Open Console"><i class="fas fa-bug"></i></button>
@@ -29,9 +26,7 @@
 
     <div id="login-screen" class="screen active">
         <div class="card login-card" style="text-align: center;">
-            
             <img src="Logo.png" alt="Task Flow Logo" style="width: 100%; max-width: 280px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
-            
             <h2 style="margin-top: 0;">Welcome Back</h2>
             <button id="login-google-btn" class="btn primary-btn"><i class="fab fa-google"></i> Login with Google</button>
             <div class="divider"><span>OR</span></div>
@@ -47,8 +42,11 @@
 
     <div id="profile-screen" class="screen">
         <div class="card">
-            <h2>Your Profile</h2>
+            <h2>Your Profile & Settings</h2>
+            
+            <label class="input-label">Personal Details:</label>
             <input type="text" id="prof-name" placeholder="Full Name (No spaces for Ntfy)" class="input-field">
+            <input type="text" id="prof-emp-id" placeholder="Employee ID" class="input-field">
             <input type="email" id="prof-email" placeholder="Gmail Address" class="input-field">
             <input type="tel" id="prof-phone" placeholder="Phone Number (+91...)" class="input-field">
             <select id="prof-lab" class="input-field">
@@ -56,6 +54,22 @@
                 <option value="HET">HET Lab</option>
                 <option value="Both">Both Labs</option>
             </select>
+
+            <label class="input-label" style="margin-top: 20px;"><i class="fas fa-paint-brush"></i> App Appearance:</label>
+            <select id="prof-ui-style" class="input-field">
+                <option value="normal">Normal Look (Solid)</option>
+                <option value="glassy">Glassy Look (Transparent blur)</option>
+            </select>
+
+            <label class="input-label" style="margin-top: 15px;"><i class="fas fa-image"></i> App Background:</label>
+            <div class="theme-grid">
+                <div class="theme-option selected" data-theme="none" style="background: #121212;">Dark</div>
+                <div class="theme-option" data-theme="bg/bg3.jpg" style="background: url('bg/bg3.jpg') center/cover;"></div>
+                <div class="theme-option" data-theme="bg/bg4.jpg" style="background: url('bg/bg4.jpg') center/cover;"></div>
+                <div class="theme-option" data-theme="bg/bg5.jpg" style="background: url('bg/bg5.jpg') center/cover;"></div>
+                <div class="theme-option" data-theme="bg/Picsart_26-04-06_00-12-53-578.jpg" style="background: url('bg/Picsart_26-04-06_00-12-53-578.jpg') center/cover;"></div>
+            </div>
+            <input type="hidden" id="prof-bg-theme" value="none">
             
             <div style="margin-top: 15px; padding: 10px; background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; border-radius: 6px;">
                 <label style="font-size: 0.8rem; color: #a7f3d0;"><i class="fas fa-satellite-dish"></i> Your Personal Ntfy Channel</label>
@@ -66,18 +80,18 @@
                 </div>
             </div>
 
-            <button id="save-profile-btn" class="btn primary-btn" style="width: 100%; margin-top: 15px;">Save Profile</button>
+            <button id="save-profile-btn" class="btn primary-btn" style="width: 100%; margin-top: 15px;">Save Settings</button>
         </div>
     </div>
 
     <div id="dashboard-screen" class="screen">
         <header class="dashboard-header card">
             <div class="user-profile">
-                <img id="display-pic" src="" alt="Profile" class="profile-pic" onerror="this.src='https://ui-avatars.com/api/?name=U&background=2563eb&color=fff'">
+                <img id="display-pic" src="" alt="Profile" class="profile-pic" title="Tap to Edit Settings" onerror="this.src='https://ui-avatars.com/api/?name=U&background=2563eb&color=fff'">
                 <div class="user-details">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <h3 id="display-name" style="margin:0; font-size: 1.1rem;">Loading...</h3>
-                        <button id="edit-profile-btn" class="icon-btn" style="padding: 2px 6px; font-size: 0.8rem;"><i class="fas fa-pencil-alt"></i></button>
+                        <button id="edit-profile-btn" class="icon-btn" style="padding: 2px 6px; font-size: 0.8rem;" title="Edit Settings"><i class="fas fa-pencil-alt"></i></button>
                     </div>
                     <span id="display-lab" class="badge">Lab</span>
                 </div>
@@ -132,7 +146,10 @@
                 <button id="chat-back-btn" class="icon-btn hidden" style="color:white;"><i class="fas fa-arrow-left"></i></button>
                 <h3 id="chat-panel-title" style="margin:0;"><i class="fas fa-address-book"></i> Contacts</h3>
             </div>
-            <button id="close-chat-btn" class="icon-btn" style="color:white;"><i class="fas fa-times"></i></button>
+            <div>
+                <button id="chat-info-btn" class="icon-btn hidden" style="color:white; margin-right:10px;"><i class="fas fa-info-circle"></i></button>
+                <button id="close-chat-btn" class="icon-btn" style="color:white;"><i class="fas fa-times"></i></button>
+            </div>
         </div>
         
         <div id="chat-contact-list" class="chat-messages" style="flex: 1; overflow-y: auto;">
@@ -143,13 +160,32 @@
         
         <div id="chat-conversation-area" class="hidden" style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
             <div id="chat-messages" class="chat-messages" style="flex: 1; overflow-y: auto; padding-bottom: 10px;"></div>
-            <div class="chat-input-area" style="display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: #1a1a1a; border-top: 1px solid #333; flex-shrink: 0;">
+            <div class="chat-input-area" style="display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; flex-shrink: 0;">
                 <select id="chat-priority" class="input-field" style="width: 100px; margin: 0; padding: 8px; font-size: 0.85rem;">
                     <option value="3">Normal Chat</option>
                     <option value="4" style="color: #ef4444; font-weight: bold;">Urgent 🚨</option>
                 </select>
                 <input type="text" id="chat-input" placeholder="Type a message..." class="input-field" style="margin:0; flex:1; min-width: 150px;">
                 <button id="send-chat-btn" class="btn primary-btn" style="width: 50px; padding: 10px;"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="user-info-modal" class="modal">
+        <div class="modal-content card" style="text-align: center; border-top: 4px solid var(--primary);">
+            <img id="info-pic" src="" style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--primary); margin: 0 auto 10px auto; display: block;">
+            <h3 id="info-name" style="margin-top:0;">Name</h3>
+            <span id="info-lab-badge" class="badge" style="display: inline-block; margin-bottom: 15px;">Lab</span>
+            
+            <div style="text-align: left; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; font-size: 0.95rem;">
+                <p style="margin: 8px 0;"><i class="fas fa-id-badge" style="color:var(--text-muted); width:20px;"></i> <strong>Emp ID:</strong> <span id="info-emp-id">N/A</span></p>
+                <p style="margin: 8px 0;"><i class="fas fa-phone" style="color:var(--text-muted); width:20px;"></i> <strong>Mobile:</strong> <span id="info-phone"></span></p>
+                <p style="margin: 8px 0;"><i class="fas fa-envelope" style="color:var(--text-muted); width:20px;"></i> <strong>Email:</strong> <span id="info-email"></span></p>
+                <p style="margin: 8px 0;"><i class="fas fa-satellite-dish" style="color:var(--text-muted); width:20px;"></i> <strong>Ntfy Channel:</strong><br><span id="info-ntfy" style="color:#10b981; font-family:monospace; display:block; margin-top:5px; font-size: 0.8rem;"></span></p>
+            </div>
+            
+            <div class="modal-actions">
+                <button id="close-info-modal-btn" class="btn secondary-btn" style="width: 100%;">Close Profile</button>
             </div>
         </div>
     </div>
