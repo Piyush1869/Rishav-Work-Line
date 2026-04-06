@@ -22,7 +22,7 @@ document.getElementById('close-debug-btn').addEventListener('click', () => docum
 document.getElementById('clear-debug-btn').addEventListener('click', () => { debugLog.innerHTML = ''; sessionStorage.removeItem('app_debug_logs'); console.log("🗑️ Console Cleared."); });
 
 // ==========================================
-// 🛠️ PWA INSTALL LOGIC (Original Method)
+// 🛠️ PWA INSTALL LOGIC 
 // ==========================================
 if ('serviceWorker' in navigator) { 
     navigator.serviceWorker.register('/sw.js')
@@ -89,20 +89,19 @@ function pushToNtfy(alertTitle, alertMessage, priorityLevel, customTopicSuffix =
     .catch(err => console.error("❌ Ntfy Network Error:", err));
 }
 
-// === GOOGLE SHEETS SYNC LOGIC (FIXED) ===
-async function logToGoogleSheets(taskData, action = "Update") {
+// === GOOGLE SHEETS SYNC (BULLETPROOF) ===
+async function logToGoogleSheets(taskData) {
     if (!GOOGLE_SHEETS_WEBHOOK) return;
     
-    // Safely guarantee we always send a username to the sheet
-    const sheetUserName = currentUserDoc ? currentUserDoc.name : "Unknown User";
+    // Safely guarantee we always send the proper username to the sheet
+    const sheetUserName = currentUserDoc && currentUserDoc.name ? currentUserDoc.name : "Unknown User";
     
     const payload = { 
         userName: sheetUserName, 
-        taskName: taskData.title || "Untitled", 
+        taskName: taskData.title || "Untitled Task", 
         details: taskData.details || "No details provided", 
         status: taskData.status || "Pending", 
-        type: taskData.isPrivate ? "Private Task" : "Lab Task",
-        action: action
+        type: taskData.isPrivate ? "Private Task" : "Lab Task"
     };
 
     console.log("📊 Sending to Google Sheets:", payload);
@@ -169,7 +168,7 @@ document.getElementById('edit-profile-btn').addEventListener('click', () => {
     if (currentUserDoc) { document.getElementById('prof-name').value = currentUserDoc.name || ''; document.getElementById('prof-email').value = currentUserDoc.email || ''; document.getElementById('prof-phone').value = currentUserDoc.phone || ''; document.getElementById('prof-lab').value = currentUserDoc.lab || 'PVL'; document.getElementById('prof-email').style.display = 'block'; document.getElementById('prof-phone').style.display = 'block'; showScreen('profile'); }
 });
 
-// === 1-ON-1 CHAT ===
+// === 1-ON-1 CHAT WITH PRIORITIES & PERSONAL CHANNELS ===
 let currentChatUser = null; let chatUnsubscribe = null;
 function getChatId(uid1, uid2) { return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`; }
 const chatPanel = document.getElementById('chat-panel'); const contactListArea = document.getElementById('chat-contact-list'); const conversationArea = document.getElementById('chat-conversation-area'); const chatTitle = document.getElementById('chat-panel-title'); const backBtn = document.getElementById('chat-back-btn');
@@ -177,7 +176,7 @@ document.getElementById('fab-chat').addEventListener('click', () => { chatPanel.
 document.getElementById('close-chat-btn').addEventListener('click', () => chatPanel.classList.add('hidden'));
 backBtn.addEventListener('click', () => showContactList());
 
-function showContactList() { currentChatUser = null; if(chatUnsubscribe) { chatUnsubscribe(); chatUnsubscribe = null; } backBtn.classList.add('hidden'); chatTitle.innerHTML = `<i class="fas fa-address-book"></i> Contacts`; conversationArea.classList.add('hidden'); contactListArea.classList.remove('hidden'); }
+function showContactList() { currentChatUser = null; if(chatUnsubscribe) { chatUnsubscribe(); chatUnsubscribe = null; } backBtn.classList.add('hidden'); chatTitle.innerHTML = `<i class=\"fas fa-address-book\"></i> Contacts`; conversationArea.classList.add('hidden'); contactListArea.classList.remove('hidden'); }
 
 function openDirectChat(targetUser) { 
     currentChatUser = targetUser; backBtn.classList.remove('hidden'); chatTitle.textContent = targetUser.name; contactListArea.classList.add('hidden'); conversationArea.classList.remove('hidden'); const chatId = getChatId(auth.currentUser.uid, targetUser.uid); const chatMessages = document.getElementById('chat-messages'); if(chatUnsubscribe) chatUnsubscribe(); 
@@ -185,7 +184,7 @@ function openDirectChat(targetUser) {
         const msgs = []; snapshot.forEach(doc => msgs.push(doc.data())); 
         msgs.sort((a, b) => { const timeA = a.timestamp ? a.timestamp.toMillis() : Date.now(); const timeB = b.timestamp ? b.timestamp.toMillis() : Date.now(); return timeA - timeB; }); 
         chatMessages.innerHTML = ''; 
-        msgs.forEach(msg => { const isMine = msg.senderId === auth.currentUser.uid; const timeString = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Sending...'; chatMessages.innerHTML += `<div class="chat-msg ${isMine ? 'msg-mine' : 'msg-theirs'}">${msg.text}<span class="time">${timeString}</span></div>`; }); 
+        msgs.forEach(msg => { const isMine = msg.senderId === auth.currentUser.uid; const timeString = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Sending...'; chatMessages.innerHTML += `<div class=\"chat-msg ${isMine ? 'msg-mine' : 'msg-theirs'}\">${msg.text}<span class=\"time\">${timeString}</span></div>`; }); 
         chatMessages.scrollTop = chatMessages.scrollHeight; 
     });
 }
@@ -216,8 +215,8 @@ function setupDashboard(user, profile) {
     if (profNtfyId) profNtfyId.value = myPersonalChannel;
 
     onSnapshot(collection(db, "users"), (snapshot) => {
-        contactListArea.innerHTML = `<div style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.85rem; color: #a7f3d0;"><i class="fas fa-info-circle"></i> <strong>Tip:</strong> Subscribe to your personal Ntfy channel on your phone to get DMs! (Example: <em>rishav_lab_alerts_2026_${mySafeCleanName}</em>)</div>`; 
-        snapshot.forEach(userDoc => { const u = userDoc.data(); if(u.uid !== user.uid) { const contactEl = document.createElement('div'); contactEl.className = 'contact-item'; contactEl.innerHTML = `<img src="${u.photoURL}" onerror="this.src='https://ui-avatars.com/api/?name=${u.name[0]}&background=2563eb&color=fff'"><div><span class="name">${u.name}</span><span class="lab">${u.lab} Lab - ${u.status === 'Active' ? '🟢' : '🔴'}</span></div>`; contactEl.onclick = () => openDirectChat(u); contactListArea.appendChild(contactEl); } });
+        contactListArea.innerHTML = `<div style=\"background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.85rem; color: #a7f3d0;\"><i class=\"fas fa-info-circle\"></i> <strong>Tip:</strong> Subscribe to your personal Ntfy channel on your phone to get DMs! (Example: <em>rishav_lab_alerts_2026_${mySafeCleanName}</em>)</div>`; 
+        snapshot.forEach(userDoc => { const u = userDoc.data(); if(u.uid !== user.uid) { const contactEl = document.createElement('div'); contactEl.className = 'contact-item'; contactEl.innerHTML = `<img src=\"${u.photoURL}\" onerror=\"this.src='https://ui-avatars.com/api/?name=${u.name[0]}&background=2563eb&color=fff'\"><div><span class=\"name\">${u.name}</span><span class=\"lab\">${u.lab} Lab - ${u.status === 'Active' ? '🟢' : '🔴'}</span></div>`; contactEl.onclick = () => openDirectChat(u); contactListArea.appendChild(contactEl); } });
     });
 
     onSnapshot(collection(db, "notices"), (snapshot) => {
@@ -228,19 +227,19 @@ function setupDashboard(user, profile) {
         notices.sort((a, b) => { const tA = a.timestamp ? a.timestamp.toMillis() : Date.now(); const tB = b.timestamp ? b.timestamp.toMillis() : Date.now(); return tB - tA; });
         
         if (notices.length === 0) {
-            noticeList.innerHTML = '<p class="text-muted">No notices right now.</p>';
+            noticeList.innerHTML = '<p class=\"text-muted\">No notices right now.</p>';
         } else {
             noticeList.innerHTML = '';
             notices.forEach(notice => {
                 const timeString = notice.timestamp ? new Date(notice.timestamp.toDate()).toLocaleString([], {month:'short', day:'numeric', hour: '2-digit', minute:'2-digit'}) : 'Just now';
                 noticeList.innerHTML += `
-                    <div style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 10px; border-radius: 4px;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom: 5px;">
-                            <strong style="color: #ef4444;">${notice.title}</strong>
-                            <span style="font-size: 0.75rem; color: #aaa;">${timeString}</span>
+                    <div style=\"background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 10px; border-radius: 4px;\">
+                        <div style=\"display:flex; justify-content:space-between; margin-bottom: 5px;\">
+                            <strong style=\"color: #ef4444;\">${notice.title}</strong>
+                            <span style=\"font-size: 0.75rem; color: #aaa;\">${timeString}</span>
                         </div>
-                        <p style="margin: 0; font-size: 0.9rem;">${notice.details}</p>
-                        <div style="margin-top: 5px; font-size: 0.8rem; color: #888;">- Posted by ${notice.senderName}</div>
+                        <p style=\"margin: 0; font-size: 0.9rem;\">${notice.details}</p>
+                        <div style=\"margin-top: 5px; font-size: 0.8rem; color: #888;\">- Posted by ${notice.senderName}</div>
                     </div>
                 `;
             });
@@ -256,19 +255,14 @@ function setupDashboard(user, profile) {
         snapshot.forEach(taskDoc => {
             const task = taskDoc.data(); const taskId = taskDoc.id;
 
-            // RENDER PRIVATE TASKS
             if(task.isPrivate) {
                 if(task.ownerId === user.uid) {
                     myPrivCount++;
                     const pEl = document.createElement('div'); pEl.className = 'task-item';
-                    pEl.innerHTML = `<h4>${task.title} <span class="priv-badge">${task.status}</span></h4><p>${task.details}</p><p><i class="far fa-calendar"></i> ${task.startDate} | <i class="far fa-clock"></i> ${task.startTime}</p>`;
+                    pEl.innerHTML = `<h4>${task.title} <span class=\"priv-badge\">${task.status}</span></h4><p>${task.details}</p><p><i class=\"far fa-calendar\"></i> ${task.startDate} | <i class=\"far fa-clock\"></i> ${task.startTime}</p>`;
                     if(task.status !== "Done") {
                         const nextStatusBtn = document.createElement('button'); nextStatusBtn.className = 'priv-btn'; nextStatusBtn.textContent = task.status === "Upcoming" ? "Start (Mark Ongoing)" : "Finish (Mark Done)";
-                        nextStatusBtn.onclick = async () => { 
-                            const newStatus = task.status === "Upcoming" ? "Ongoing" : "Done"; 
-                            await updateDoc(taskDoc.ref, { status: newStatus }); 
-                            logToGoogleSheets({ ...task, status: newStatus }, "Update"); 
-                        };
+                        nextStatusBtn.onclick = async () => { const newStatus = task.status === "Upcoming" ? "Ongoing" : "Done"; await updateDoc(taskDoc.ref, { status: newStatus }); logToGoogleSheets({ ...task, status: newStatus }); };
                         pEl.appendChild(nextStatusBtn);
                     }
                     privList.appendChild(pEl);
@@ -276,7 +270,6 @@ function setupDashboard(user, profile) {
                 return;
             }
 
-            // RENDER LAB TASKS
             if(task.createdBy === user.uid) { statCreated++; if(task.status !== "Pending") statHelped++; }
             if(task.acceptedById === user.uid) statAccepted++;
 
@@ -287,26 +280,17 @@ function setupDashboard(user, profile) {
             if ((task.targetLab !== "Both") && (profile.lab !== "Both") && (task.targetLab !== profile.lab)) return;
 
             const taskEl = document.createElement('div'); taskEl.className = 'task-item';
-            taskEl.innerHTML = `<h4>${task.title}</h4><p><i class="fas fa-info-circle"></i> ${task.details}</p><p><i class="far fa-clock"></i> Time: ${task.timeNeeded} | Mgr: ${task.manager}</p>`;
+            taskEl.innerHTML = `<h4>${task.title}</h4><p><i class=\"fas fa-info-circle\"></i> ${task.details}</p><p><i class=\"far fa-clock\"></i> Time: ${task.timeNeeded} | Mgr: ${task.manager}</p>`;
 
             if (task.status === "Pending" && (task.assignedTo === "All" || task.assignedTo === "WhatsApp" || task.assignedTo === "BothAlerts" || task.assignedTo === user.uid)) {
                 if (task.assignedTo === "All" || task.assignedTo === "BothAlerts") unassignedCount++;
-                const acceptBtn = document.createElement('button'); acceptBtn.className = 'task-btn'; acceptBtn.style.background = 'rgba(245, 158, 11, 0.2)'; acceptBtn.style.color = '#fbbf24'; acceptBtn.innerHTML = '<i class="fas fa-hand-paper"></i> Accept Task';
-                acceptBtn.onclick = async () => { 
-                    const time = prompt("Expected completion time?"); 
-                    if(time) { 
-                        await updateDoc(taskDoc.ref, { status: "Accepted", acceptedBy: profile.name, acceptedById: user.uid, expectedTime: time }); 
-                        logToGoogleSheets({ ...task, status: "Accepted" }, "Accepted"); 
-                    } 
-                };
+                const acceptBtn = document.createElement('button'); acceptBtn.className = 'task-btn'; acceptBtn.style.background = 'rgba(245, 158, 11, 0.2)'; acceptBtn.style.color = '#fbbf24'; acceptBtn.innerHTML = '<i class=\"fas fa-hand-paper\"></i> Accept Task';
+                acceptBtn.onclick = async () => { const time = prompt("Expected completion time?"); if(time) { await updateDoc(taskDoc.ref, { status: "Accepted", acceptedBy: profile.name, acceptedById: user.uid, expectedTime: time }); logToGoogleSheets({ ...task, status: "Accepted" }); } };
                 taskEl.appendChild(acceptBtn); openList.appendChild(taskEl);
             } else if (task.acceptedById === user.uid) {
                 if (task.status !== "Done") {
-                    const doneBtn = document.createElement('button'); doneBtn.className = 'task-btn done'; doneBtn.innerHTML = '<i class="fas fa-check"></i> Mark as Done';
-                    doneBtn.onclick = async () => { 
-                        await updateDoc(taskDoc.ref, { status: "Done" }); 
-                        logToGoogleSheets({ ...task, status: "Done" }, "Completed"); 
-                    };
+                    const doneBtn = document.createElement('button'); doneBtn.className = 'task-btn done'; doneBtn.innerHTML = '<i class=\"fas fa-check\"></i> Mark as Done';
+                    doneBtn.onclick = async () => { await updateDoc(taskDoc.ref, { status: "Done" }); logToGoogleSheets({ ...task, status: "Done" }); };
                     taskEl.appendChild(doneBtn);
                 }
                 myList.appendChild(taskEl); myAcceptedCount++;
@@ -318,64 +302,55 @@ function setupDashboard(user, profile) {
         if (unassignedCount > 0 && profile.status === "Active") { if(!isRinging) { flashOverlay.style.display = 'block'; try { alarmAudio.play(); }catch(e){} isRinging = true; } } 
         else { flashOverlay.style.display = 'none'; alarmAudio.pause(); alarmAudio.currentTime = 0; isRinging = false; }
 
-        if (unassignedCount === 0) openList.innerHTML = '<p class="text-muted">No pending tasks right now.</p>';
-        if (myAcceptedCount === 0) myList.innerHTML = '<p class="text-muted">You have no accepted tasks.</p>';
-        if (myPrivCount === 0) privList.innerHTML = '<p class="text-muted">No private tasks.</p>';
+        if (unassignedCount === 0) openList.innerHTML = '<p class=\"text-muted\">No pending tasks right now.</p>';
+        if (myAcceptedCount === 0) myList.innerHTML = '<p class=\"text-muted\">You have no accepted tasks.</p>';
+        if (myPrivCount === 0) privList.innerHTML = '<p class=\"text-muted\">No private tasks.</p>';
     });
 }
 
-// === NOTICES ===
 const noticeModal = document.getElementById('notice-modal');
 document.getElementById('open-notice-btn').addEventListener('click', () => noticeModal.style.display = 'flex');
 document.getElementById('close-notice-modal-btn').addEventListener('click', () => noticeModal.style.display = 'none');
 
 document.getElementById('submit-notice-btn').addEventListener('click', async () => {
-    const title = document.getElementById('notice-title').value;
-    const details = document.getElementById('notice-details').value;
+    const title = document.getElementById('notice-title')?.value;
+    const details = document.getElementById('notice-details')?.value;
     if(!title) { alert("Title is required!"); return; }
 
     await addDoc(collection(db, "notices"), {
-        title: title, details: details, senderName: currentUserDoc.name, senderId: auth.currentUser.uid, timestamp: serverTimestamp()
+        title: title, details: details || "", senderName: currentUserDoc.name, senderId: auth.currentUser.uid, timestamp: serverTimestamp()
     });
     
-    noticeModal.style.display = 'none'; document.getElementById('notice-title').value = ''; document.getElementById('notice-details').value = '';
+    noticeModal.style.display = 'none'; 
+    if(document.getElementById('notice-title')) document.getElementById('notice-title').value = ''; 
+    if(document.getElementById('notice-details')) document.getElementById('notice-details').value = '';
     showToast("Notice Published!", "fa-bullhorn");
 
     pushToNtfy(`📢 NOTICE: ${title}`, `${details}\n- Posted by ${currentUserDoc.name}`, "4", ""); 
 });
 
-// === LAB TASK CREATION LOGIC ===
 const taskModal = document.getElementById('task-modal');
 document.getElementById('fab-add-task').addEventListener('click', () => taskModal.style.display = 'flex');
 document.getElementById('close-modal-btn').addEventListener('click', () => taskModal.style.display = 'none');
 
 document.getElementById('submit-task-btn').addEventListener('click', async () => {
     try {
-        const title = document.getElementById('task-title').value; 
-        const details = document.getElementById('task-details').value || "No Details";
-        const timeNeeded = document.getElementById('task-time').value || "Not Specified"; 
-        const manager = document.getElementById('task-manager').value || "Self";
-        const alertMethod = document.getElementById('task-assignee').value;
+        const title = document.getElementById('task-title')?.value; 
+        const details = document.getElementById('task-details')?.value || "No Details";
+        const timeNeeded = document.getElementById('task-time')?.value || "Not Specified"; 
+        const manager = document.getElementById('task-manager')?.value || currentUserDoc.name;
+        const alertMethod = document.getElementById('task-assignee')?.value || "All";
         if(!title) { alert("Title is required!"); return; }
         
-        const newTask = { 
-            title: title, details: details, timeNeeded: timeNeeded, manager: manager, 
-            targetLab: document.getElementById('task-target-lab').value, assignedTo: alertMethod, 
-            status: "Pending", createdBy: auth.currentUser.uid, ownerName: currentUserDoc.name, 
-            isPrivate: false, timestamp: serverTimestamp() 
-        };
-        
-        console.log("Saving Lab Task:", newTask);
+        const newTask = { title: title, details: details, timeNeeded: timeNeeded, manager: manager, targetLab: document.getElementById('task-target-lab')?.value || "Both", assignedTo: alertMethod, status: "Pending", createdBy: auth.currentUser.uid, isPrivate: false, timestamp: serverTimestamp() };
         await addDoc(collection(db, "tasks"), newTask);
         
         taskModal.style.display = 'none'; 
-        document.getElementById('task-title').value = ''; 
-        document.getElementById('task-details').value = '';
-        document.getElementById('task-time').value = ''; 
-        document.getElementById('task-manager').value = '';
+        if(document.getElementById('task-title')) document.getElementById('task-title').value = ''; 
+        if(document.getElementById('task-details')) document.getElementById('task-details').value = '';
         showToast("Task Published!", "fa-check");
 
-        logToGoogleSheets(newTask, "Created"); 
+        logToGoogleSheets(newTask); 
 
         if (alertMethod === "All" || alertMethod === "BothAlerts") {
             pushToNtfy('🚨 NEW LAB TASK', `Task: ${title}\nManager: ${manager}\nTime: ${timeNeeded}`, "5", "");
@@ -384,51 +359,56 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
         if (alertMethod === "WhatsApp" || alertMethod === "BothAlerts") {
             window.open(`https://wa.me/?text=${encodeURIComponent(`🚨 *NEW LAB TASK: ${title}* 🚨\n\n📌 *Details:* ${details}\n⏰ *Time:* ${timeNeeded}\n👨‍💼 *Manager:* ${manager}`)}`, '_blank');
         }
-    } catch (err) {
-        console.error("Task Creation Error:", err);
-        alert("Failed to save Task. Please check console.");
+    } catch(err) {
+        console.error("Task Save Error:", err);
     }
 });
 
-// === PRIVATE TASK CREATION LOGIC (FIXED) ===
+// === PRIVATE TASK CREATION LOGIC (BULLETPROOF) ===
 const privModal = document.getElementById('private-task-modal');
 document.getElementById('inline-add-priv-btn').addEventListener('click', () => privModal.style.display = 'flex');
 document.getElementById('close-priv-modal-btn').addEventListener('click', () => privModal.style.display = 'none');
 
 document.getElementById('submit-priv-task-btn').addEventListener('click', async () => {
     try {
-        const title = document.getElementById('priv-task-title').value;
+        // Safely pull fields, using optional chaining (?.) so it never crashes on null
+        const titleEl = document.getElementById('priv-task-title');
+        const detailsEl = document.getElementById('priv-task-details');
+        const dateEl = document.getElementById('priv-task-date');
+        const timeEl = document.getElementById('priv-task-time');
+        const statusEl = document.getElementById('priv-task-status');
+
+        const title = titleEl?.value;
         if(!title) { alert("Title is required!"); return; }
 
-        // Safely pull fields, fallback to strings if empty to prevent Firebase crashes
         const newTask = {
             title: title, 
-            details: document.getElementById('priv-task-details').value || "No Details",
-            startDate: document.getElementById('priv-task-date').value || "No Date", 
-            startTime: document.getElementById('priv-task-time').value || "No Time",
-            status: document.getElementById('priv-task-status').value || "Upcoming", 
+            details: detailsEl?.value || "No Details",
+            startDate: dateEl?.value || "No Date", 
+            startTime: timeEl?.value || "No Time",
+            status: statusEl?.value || "Upcoming", 
             ownerId: auth.currentUser.uid, 
-            ownerName: currentUserDoc.name,
+            ownerName: currentUserDoc.name, // Safely attaches user's name!
             isPrivate: true, 
             timestamp: serverTimestamp()
         };
         
-        console.log("Attempting to save Private Task to Firestore:", newTask);
+        console.log("Saving Private Task:", newTask);
         await addDoc(collection(db, "tasks"), newTask);
-        console.log("✅ Private Task saved perfectly.");
         
         privModal.style.display = 'none'; 
-        document.getElementById('priv-task-title').value = ''; 
-        document.getElementById('priv-task-details').value = '';
-        document.getElementById('priv-task-date').value = ''; 
-        document.getElementById('priv-task-time').value = '';
+        if(titleEl) titleEl.value = ''; 
+        if(detailsEl) detailsEl.value = '';
+        if(dateEl) dateEl.value = '';
+        if(timeEl) timeEl.value = '';
+        
         showToast("Private Task Saved!", "fa-lock");
 
-        // Send to Google Sheets instantly
-        logToGoogleSheets(newTask, "Created"); 
+        // Sends to Google Sheets explicitly!
+        logToGoogleSheets(newTask); 
 
-    } catch (err) {
+    } catch(err) {
         console.error("Private Task Creation Error:", err);
-        alert("Failed to save Private Task. Please check console.");
+        alert("Failed to save Private Task. Check console.");
     }
 });
