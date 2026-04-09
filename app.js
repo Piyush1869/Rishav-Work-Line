@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 // ==========================================
@@ -17,6 +17,24 @@ console.error = (...args) => { originalError(...args); logToScreen(formatMsg(arg
 document.getElementById('debug-btn').addEventListener('click', () => document.getElementById('debug-modal').style.display = 'flex');
 document.getElementById('close-debug-btn').addEventListener('click', () => document.getElementById('debug-modal').style.display = 'none');
 document.getElementById('clear-debug-btn').addEventListener('click', () => { debugLog.innerHTML = ''; sessionStorage.removeItem('app_debug_logs'); });
+
+// ==========================================
+// ☰ SIDEBAR MENU CONTROLLER
+// ==========================================
+const sidebar = document.getElementById('sidebar');
+const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+document.getElementById('menu-btn').addEventListener('click', () => {
+    sidebar.classList.add('open');
+    sidebarOverlay.classList.add('active');
+});
+
+function closeSidebar() {
+    sidebar.classList.remove('open');
+    sidebarOverlay.classList.remove('active');
+}
+document.getElementById('close-sidebar-btn').addEventListener('click', closeSidebar);
+sidebarOverlay.addEventListener('click', closeSidebar);
 
 // ==========================================
 // 🛠️ PWA INSTALL LOGIC
@@ -99,7 +117,7 @@ function pushToNtfy(alertTitle, alertMessage, priorityLevel, customTopicSuffix =
 
 async function logToGoogleSheets(taskData, action = "Update") {
     if (!GOOGLE_SHEETS_WEBHOOK) return;
-    const sheetUserName = currentUserDoc && currentUserDoc.name ? currentUserDoc.name : "Unknown User";
+    const sheetUserName = currentUserDoc && currentUserDoc.name ? currentUserDoc.name : (taskData.userName || "Unknown User");
     
     const payload = { 
         userName: sheetUserName, 
@@ -122,15 +140,53 @@ if(alertBtn) alertBtn.addEventListener('click', async () => { try { const perm =
 const screens = { login: document.getElementById('login-screen'), profile: document.getElementById('profile-screen'), dashboard: document.getElementById('dashboard-screen') };
 function showScreen(screenName) { Object.values(screens).forEach(s => { if(s) s.classList.remove('active'); }); if(screens[screenName]) screens[screenName].classList.add('active'); }
 
-// === AUTHENTICATION & PROFILE ===
+// === AUTHENTICATION LOGIC (EMAIL & GOOGLE) ===
+document.getElementById('show-register').addEventListener('click', (e) => { e.preventDefault(); document.getElementById('login-form').style.display = 'none'; document.getElementById('register-form').style.display = 'block'; });
+document.getElementById('show-login').addEventListener('click', (e) => { e.preventDefault(); document.getElementById('register-form').style.display = 'none'; document.getElementById('login-form').style.display = 'block'; });
+
 document.getElementById('login-google-btn').addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()));
-window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { 'size': 'normal' });
-document.getElementById('send-otp-btn').addEventListener('click', () => { signInWithPhoneNumber(auth, document.getElementById('phone-number').value, window.recaptchaVerifier).then((res) => { window.confirmationResult = res; document.getElementById('otp-section').style.display = 'block'; document.getElementById('send-otp-btn').style.display = 'none'; }); });
-document.getElementById('verify-otp-btn').addEventListener('click', () => window.confirmationResult.confirm(document.getElementById('otp-code').value));
+
+document.getElementById('login-btn').addEventListener('click', async () => {
+    const email = document.getElementById('login-email').value;
+    const pass = document.getElementById('login-pass').value;
+    if(!email || !pass) { alert("Please enter both Email and Password."); return; }
+    try { await signInWithEmailAndPassword(auth, email, pass); } 
+    catch(err) { console.error(err); alert("Login Failed: " + err.message); }
+});
+
+document.getElementById('register-btn').addEventListener('click', async () => {
+    const name = document.getElementById('reg-name').value;
+    const email = document.getElementById('reg-email').value;
+    const phone = document.getElementById('reg-phone').value;
+    const empId = document.getElementById('reg-emp-id').value;
+    const lab = document.getElementById('reg-lab').value;
+    const pass = document.getElementById('reg-pass').value;
+    const passConf = document.getElementById('reg-pass-conf').value;
+
+    if(!name || !email || !phone || !empId || !lab || !pass) { alert("Please fill all fields!"); return; }
+    if(pass !== passConf) { alert("Passwords do not match!"); return; }
+
+    try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+        const user = userCredential.user;
+        const cleanName = name.replace(/[^a-zA-Z0-9]/g, ""); 
+        
+        const profileData = { 
+            uid: user.uid, name: name, cleanName: cleanName, 
+            empId: empId, uiStyle: 'normal', bgTheme: 'none',
+            email: email, phone: phone, lab: lab, status: "Active", 
+            photoURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'U')}&background=2563eb&color=fff` 
+        };
+        
+        await setDoc(doc(db, "users", user.uid), profileData);
+        logToGoogleSheets({ userName: name, title: "Account Setup", details: `Profile registered for ${name}`, status: "Active", isPrivate: false }, "User_Registration");
+        showToast("Registration Successful!", "fa-check");
+    } catch(err) { console.error(err); alert(err.message); }
+});
 
 onAuthStateChanged(auth, async (user) => {
     if (user) {
-        console.log(`✅ Logged in (${user.email || user.phoneNumber})`);
+        console.log(`✅ Logged in (${user.email})`);
         const userSnap = await getDoc(doc(db, "users", user.uid));
         if (userSnap.exists()) {
             currentUserDoc = userSnap.data(); 
@@ -139,8 +195,7 @@ onAuthStateChanged(auth, async (user) => {
             showScreen('dashboard');
         } else {
             showScreen('profile');
-            if (user.email) { document.getElementById('prof-email').style.display = 'none'; document.getElementById('prof-phone').style.display = 'block'; } 
-            else { document.getElementById('prof-phone').style.display = 'none'; document.getElementById('prof-email').style.display = 'block'; }
+            if (user.email) { document.getElementById('prof-email').value = user.email; } 
         }
     } else { showScreen('login'); }
 });
@@ -162,7 +217,7 @@ document.getElementById('save-profile-btn').addEventListener('click', async () =
         uid: user.uid, name: rawName, cleanName: cleanName, 
         empId: document.getElementById('prof-emp-id')?.value || "N/A", 
         uiStyle: uiStyle, bgTheme: bgTheme,
-        email: document.getElementById('prof-email').value || user.email, phone: document.getElementById('prof-phone').value || user.phoneNumber, 
+        email: document.getElementById('prof-email').value || user.email, phone: document.getElementById('prof-phone').value || "", 
         lab: document.getElementById('prof-lab').value, status: "Active", photoURL: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(rawName || 'U')}&background=2563eb&color=fff` 
     };
     await setDoc(doc(db, "users", user.uid), profileData);
@@ -172,7 +227,7 @@ document.getElementById('save-profile-btn').addEventListener('click', async () =
     showScreen('dashboard'); 
     showToast("Settings Saved!", "fa-user-check");
 
-    logToGoogleSheets({ title: "Account Setup", details: `Profile registered for ${rawName}`, status: "Active", isPrivate: false }, "User_Registration");
+    logToGoogleSheets({ userName: rawName, title: "Account Setup", details: `Profile updated for ${rawName}`, status: "Active", isPrivate: false }, "User_Registration");
 });
 
 if(document.getElementById('display-pic')) document.getElementById('display-pic').addEventListener('click', () => document.getElementById('edit-profile-btn').click());
@@ -193,8 +248,6 @@ document.getElementById('edit-profile-btn').addEventListener('click', () => {
                 if(opt.getAttribute('data-theme') === (currentUserDoc.bgTheme || 'none')) { opt.classList.add('selected'); }
             });
         }
-        document.getElementById('prof-email').style.display = 'block'; 
-        document.getElementById('prof-phone').style.display = 'block'; 
         showScreen('profile'); 
     }
 });
@@ -272,7 +325,6 @@ function setupDashboard(user, profile) {
     const myPersonalChannel = `rishav_lab_alerts_2026_${mySafeCleanName}`;
     if (document.getElementById('prof-ntfy-id')) document.getElementById('prof-ntfy-id').value = myPersonalChannel;
 
-    // ⏰ SMART REMINDER SYSTEM (Checks every 15 seconds for Overdue tasks)
     if (!window.reminderInterval) {
         window.reminderInterval = setInterval(() => {
             const tasks = document.querySelectorAll('.task-item[data-due-time]');
@@ -286,9 +338,7 @@ function setupDashboard(user, profile) {
                     try { alarmAudio.play(); setTimeout(()=>alarmAudio.pause(), 3000); } catch(e){}
                     sessionStorage.setItem(`reminded_${taskId}`, 'true');
                     el.style.borderLeftColor = '#ef4444';
-                    if (!el.innerHTML.includes('OVERDUE')) {
-                        el.innerHTML += `<p style="color:#ef4444; font-weight:bold; margin-top:5px; font-size:0.8rem;"><i class="fas fa-exclamation-triangle"></i> OVERDUE 🚨</p>`;
-                    }
+                    if (!el.innerHTML.includes('OVERDUE')) { el.innerHTML += `<p style="color:#ef4444; font-weight:bold; margin-top:5px; font-size:0.8rem;"><i class="fas fa-exclamation-triangle"></i> OVERDUE 🚨</p>`; }
                 }
             });
         }, 15000); 
@@ -328,22 +378,14 @@ function setupDashboard(user, profile) {
                     const pEl = document.createElement('div'); pEl.className = 'task-item';
                     pEl.innerHTML = `<h4>${task.title} <span class="priv-badge">${task.status}</span></h4><p>${task.details}</p><p><i class="far fa-calendar"></i> ${task.startDate} | <i class="far fa-clock"></i> ${task.startTime}</p>`;
                     
-                    // Delete Button for Private Task
                     const pDelBtn = document.createElement('button');
-                    pDelBtn.className = 'icon-btn';
-                    pDelBtn.innerHTML = '<i class="fas fa-trash"></i>';
-                    pDelBtn.style.float = 'right';
-                    pDelBtn.style.color = '#ef4444';
+                    pDelBtn.className = 'icon-btn'; pDelBtn.innerHTML = '<i class="fas fa-trash"></i>'; pDelBtn.style.float = 'right'; pDelBtn.style.color = '#ef4444';
                     pDelBtn.onclick = async () => { if(confirm("Delete private task?")) await deleteDoc(taskDoc.ref); };
                     pEl.prepend(pDelBtn);
 
                     if(task.status !== "Done") {
                         const nextStatusBtn = document.createElement('button'); nextStatusBtn.className = 'priv-btn'; nextStatusBtn.textContent = task.status === "Upcoming" ? "Start (Mark Ongoing)" : "Finish (Mark Done)";
-                        nextStatusBtn.onclick = async () => { 
-                            const newStatus = task.status === "Upcoming" ? "Ongoing" : "Done"; 
-                            await updateDoc(taskDoc.ref, { status: newStatus }); 
-                            logToGoogleSheets({ ...task, status: newStatus }, "Update"); 
-                        };
+                        nextStatusBtn.onclick = async () => { const newStatus = task.status === "Upcoming" ? "Ongoing" : "Done"; await updateDoc(taskDoc.ref, { status: newStatus }); logToGoogleSheets({ ...task, status: newStatus }, "Update"); };
                         pEl.appendChild(nextStatusBtn);
                     }
                     privList.appendChild(pEl);
@@ -362,77 +404,35 @@ function setupDashboard(user, profile) {
             const taskEl = document.createElement('div'); taskEl.className = 'task-item';
             taskEl.innerHTML = `<h4>${task.title}</h4><p><i class="fas fa-info-circle"></i> ${task.details}</p><p><i class="far fa-clock"></i> Time: ${task.timeNeeded} | Mgr: ${task.manager}</p>`;
 
-            // ✏️ EDIT & DELETE CONTROLS (Only visible to Creator or Assignee)
             if (task.createdBy === user.uid || task.acceptedById === user.uid) {
-                const delBtn = document.createElement('button');
-                delBtn.className = 'icon-btn';
-                delBtn.innerHTML = '<i class="fas fa-trash"></i>';
-                delBtn.style.float = 'right';
-                delBtn.style.color = '#ef4444';
-                delBtn.onclick = async () => { 
-                    if(confirm("Delete this task?")) {
-                        await deleteDoc(taskDoc.ref); 
-                        logToGoogleSheets({ ...task, status: "Deleted" }, "Deleted");
-                    }
-                };
-                
-                const editBtn = document.createElement('button');
-                editBtn.className = 'icon-btn';
-                editBtn.innerHTML = '<i class="fas fa-edit"></i>';
-                editBtn.style.float = 'right';
-                editBtn.style.color = '#3b82f6';
-                editBtn.style.marginRight = '10px';
-                editBtn.onclick = async () => { 
-                    const newDetails = prompt("Update Task Details:", task.details);
-                    if(newDetails && newDetails !== task.details) {
-                        await updateDoc(taskDoc.ref, { details: newDetails }); 
-                        logToGoogleSheets({ ...task, details: newDetails, status: "Updated" }, "Updated");
-                    }
-                };
-                taskEl.prepend(delBtn);
-                taskEl.prepend(editBtn);
+                const delBtn = document.createElement('button'); delBtn.className = 'icon-btn'; delBtn.innerHTML = '<i class="fas fa-trash"></i>'; delBtn.style.float = 'right'; delBtn.style.color = '#ef4444';
+                delBtn.onclick = async () => { if(confirm("Delete this task?")) { await deleteDoc(taskDoc.ref); logToGoogleSheets({ ...task, status: "Deleted" }, "Deleted"); } };
+                const editBtn = document.createElement('button'); editBtn.className = 'icon-btn'; editBtn.innerHTML = '<i class="fas fa-edit"></i>'; editBtn.style.float = 'right'; editBtn.style.color = '#3b82f6'; editBtn.style.marginRight = '10px';
+                editBtn.onclick = async () => { const newDetails = prompt("Update Task Details:", task.details); if(newDetails && newDetails !== task.details) { await updateDoc(taskDoc.ref, { details: newDetails }); logToGoogleSheets({ ...task, details: newDetails, status: "Updated" }, "Updated"); } };
+                taskEl.prepend(delBtn); taskEl.prepend(editBtn);
             }
 
             if (task.status === "Pending" && (task.assignedTo === "All" || task.assignedTo === "WhatsApp" || task.assignedTo === "BothAlerts" || task.assignedTo === user.uid)) {
                 if (task.assignedTo === "All" || task.assignedTo === "BothAlerts") unassignedCount++;
                 const acceptBtn = document.createElement('button'); acceptBtn.className = 'task-btn'; acceptBtn.style.background = 'rgba(245, 158, 11, 0.2)'; acceptBtn.style.color = '#fbbf24'; acceptBtn.innerHTML = '<i class="fas fa-hand-paper"></i> Accept Task';
                 
-                // ⏱️ SMART ACCEPT (Starts the Overdue Timer)
                 acceptBtn.onclick = async () => { 
                     const timeStr = prompt("Expected completion time (in minutes)? Example: 30"); 
                     const time = parseInt(timeStr);
-                    if(time && !isNaN(time)) { 
-                        await updateDoc(taskDoc.ref, { 
-                            status: "Accepted", acceptedBy: profile.name, acceptedById: user.uid, 
-                            expectedMinutes: time, acceptedAt: serverTimestamp() 
-                        }); 
-                        logToGoogleSheets({ ...task, status: "Accepted" }, "Accepted"); 
-                    } else if (timeStr !== null) {
-                        alert("Please enter a valid number of minutes.");
-                    }
+                    if(time && !isNaN(time)) { await updateDoc(taskDoc.ref, { status: "Accepted", acceptedBy: profile.name, acceptedById: user.uid, expectedMinutes: time, acceptedAt: serverTimestamp() }); logToGoogleSheets({ ...task, status: "Accepted" }, "Accepted"); 
+                    } else if (timeStr !== null) { alert("Please enter a valid number of minutes."); }
                 };
                 taskEl.appendChild(acceptBtn); openList.appendChild(taskEl);
             } else if (task.acceptedById === user.uid) {
-                
-                // Track Due Time for Accepted Tasks
                 if (task.expectedMinutes) {
                     const acceptedTimeMs = task.acceptedAt ? task.acceptedAt.toMillis() : Date.now();
                     const dueTime = acceptedTimeMs + (task.expectedMinutes * 60000);
-                    taskEl.dataset.dueTime = dueTime;
-                    taskEl.dataset.taskId = taskId;
-                    
-                    if (Date.now() > dueTime) {
-                        taskEl.style.borderLeftColor = '#ef4444';
-                        taskEl.innerHTML += `<p style="color:#ef4444; font-weight:bold; margin-top:5px; font-size:0.8rem;"><i class="fas fa-exclamation-triangle"></i> OVERDUE 🚨</p>`;
-                    }
+                    taskEl.dataset.dueTime = dueTime; taskEl.dataset.taskId = taskId;
+                    if (Date.now() > dueTime) { taskEl.style.borderLeftColor = '#ef4444'; taskEl.innerHTML += `<p style="color:#ef4444; font-weight:bold; margin-top:5px; font-size:0.8rem;"><i class="fas fa-exclamation-triangle"></i> OVERDUE 🚨</p>`; }
                 }
-
                 if (task.status !== "Done") {
                     const doneBtn = document.createElement('button'); doneBtn.className = 'task-btn done'; doneBtn.innerHTML = '<i class="fas fa-check"></i> Mark as Done';
-                    doneBtn.onclick = async () => { 
-                        await updateDoc(taskDoc.ref, { status: "Done" }); 
-                        logToGoogleSheets({ ...task, status: "Done" }, "Completed"); 
-                    };
+                    doneBtn.onclick = async () => { await updateDoc(taskDoc.ref, { status: "Done" }); logToGoogleSheets({ ...task, status: "Done" }, "Completed"); };
                     taskEl.appendChild(doneBtn);
                 }
                 myList.appendChild(taskEl); myAcceptedCount++;
@@ -465,7 +465,6 @@ document.getElementById('submit-task-btn').addEventListener('click', async () =>
     } catch(err) { console.error("Task Save Error:", err); }
 });
 
-// 🛡️ BULLETPROOF PRIVATE TASKS
 const privModal = document.getElementById('private-task-modal'); document.getElementById('inline-add-priv-btn').addEventListener('click', () => privModal.style.display = 'flex'); document.getElementById('close-priv-modal-btn').addEventListener('click', () => privModal.style.display = 'none');
 document.getElementById('submit-priv-task-btn').addEventListener('click', async () => {
     try {
