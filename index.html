@@ -13,29 +13,63 @@
     <audio id="task-alarm" loop src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
     <nav class="top-nav">
-        <div class="nav-brand"><i class="fas fa-microscope"></i> Task Flow</div>
+        <div style="display:flex; align-items:center; gap: 15px;">
+            <button id="menu-btn" class="icon-btn" style="color: white;"><i class="fas fa-bars"></i></button>
+            <div class="nav-brand"><i class="fas fa-microscope"></i> Task Flow</div>
+        </div>
         <div class="nav-actions">
             <a id="nav-ntfy-link" href="https://ntfy.sh/rishav_lab_alerts_2026" target="_blank" class="icon-btn" title="Open Ntfy Alerts" style="color: #10b981;"><i class="fas fa-satellite-dish"></i></a>
-            <a href="https://docs.google.com/spreadsheets/d/15Ek-qbxPR199SrMUttLAu9xyg922_ZpBzAKKCA9pYys/edit?usp=drivesdk" target="_blank" class="icon-btn" title="Task Sheet" style="color: #10b981;"><i class="fa-solid fa-file-lines"></i></a>
-            <a href="https://script.google.com/macros/s/AKfycbzBF6jnX1ftdhGaz-jklZRdOOT8Z91sgfAUdWAXY_eifN2khn4JqouBDGGd8IMg_wXdEg/exec" target="_blank" class="icon-btn" title="Open Ntfy Alerts" style="color: #10b981;"><i class="fa-solid fa-clipboard-check"></i></a>
             <button id="install-app-btn" style="display: none; background: #10b981; color: white;" class="btn"><i class="fas fa-download"></i></button>
             <button id="enable-alerts-btn" class="icon-btn" title="Enable Alerts"><i class="fas fa-bell"></i></button>
             <button id="debug-btn" class="icon-btn" title="Open Console"><i class="fas fa-bug"></i></button>
         </div>
     </nav>
 
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+    <aside id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <h3 style="margin:0; color:var(--primary);"><i class="fas fa-link"></i> Lab Tools</h3>
+            <button id="close-sidebar-btn" class="icon-btn" style="color:white;"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="sidebar-links">
+            <a href="https://script.google.com/macros/s/AKfycbzBF6jnX1ftdhGaz-jklZRdOOT8Z91sgfAUdWAXY_eifN2khn4JqouBDGGd8IMg_wXdEg/exec" target="_blank"><i class="fas fa-clipboard-check" style="color:#10b981; width:20px;"></i> PVL PE Instrument Tracker</a>
+            <a href="https://script.google.com/macros/s/AKfycbzojZEcok9rWP3tw-9lNlIk0FA5lVFqQPa-m8fG6npHvy6IXjtlWUz9vh_t_rVX-ZKg/exec" target="_blank"><i class="fas fa-clipboard-check" style="color:#f59e0b; width:20px;"></i> HET Lab Instrument Tracker</a>
+            <a href="https://docs.google.com/spreadsheets/d/1wTgL5lcUhHEKYQHrbUIOHaQyMtaHVSZGLsdHa90ZV6Q/edit?usp=drivesdk" target="_blank"><i class="fas fa-table" style="color:#10b981; width:20px;"></i> PVL PE lab instrument sheet</a>
+            <a href="https://docs.google.com/spreadsheets/d/1ty7Abk9umlEiiTq_VlVsyL3In58d2jthxPkGS_O-Rmw/edit?usp=drivesdk" target="_blank"><i class="fas fa-table" style="color:#f59e0b; width:20px;"></i> HET Lab Instrument Sheet</a>
+            <a href="https://docs.google.com/spreadsheets/d/15Ek-qbxPR199SrMUttLAu9xyg922_ZpBzAKKCA9pYys/edit?usp=drivesdk" target="_blank"><i class="fas fa-file-invoice" style="color:#3b82f6; width:20px;"></i> Task Sheet</a>
+        </div>
+    </aside>
+
     <div id="login-screen" class="screen active">
         <div class="card login-card" style="text-align: center;">
-            <img src="Logo.png" alt="Task Flow Logo" style="width: 100%; max-width: 280px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
-            <h2 style="margin-top: 0;">Welcome Back</h2>
-            <button id="login-google-btn" class="btn primary-btn"><i class="fab fa-google"></i> Login with Google</button>
-            <div class="divider"><span>OR</span></div>
-            <input type="tel" id="phone-number" placeholder="+91 98765 43210" class="input-field">
-            <div id="recaptcha-container" style="margin-top: 10px;"></div>
-            <button id="send-otp-btn" class="btn secondary-btn" style="width: 100%; margin-top: 10px;"><i class="fas fa-sms"></i> Send OTP</button>
-            <div id="otp-section" style="display: none; margin-top: 15px;">
-                <input type="text" id="otp-code" placeholder="Enter 6-digit OTP" class="input-field">
-                <button id="verify-otp-btn" class="btn primary-btn" style="width: 100%; margin-top: 10px;">Verify OTP</button>
+            <img src="Logo.png" alt="Task Flow Logo" style="width: 100%; max-width: 250px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+            
+            <div id="login-form">
+                <h2 style="margin-top: 0;">Welcome Back</h2>
+                <input type="email" id="login-email" placeholder="Email Address" class="input-field">
+                <input type="password" id="login-pass" placeholder="Password" class="input-field">
+                <button id="login-btn" class="btn primary-btn" style="margin-top: 15px;"><i class="fas fa-sign-in-alt"></i> Login</button>
+                <div class="divider"><span>OR</span></div>
+                <button id="login-google-btn" class="btn secondary-btn"><i class="fab fa-google"></i> Login with Google</button>
+                <p class="text-muted" style="margin-top: 20px;">New here? <a href="#" id="show-register" style="color: var(--primary); font-weight:bold;">Create an account</a></p>
+            </div>
+
+            <div id="register-form" style="display: none;">
+                <h2 style="margin-top: 0; color: #10b981;">Create Account</h2>
+                <input type="text" id="reg-name" placeholder="Full Name" class="input-field">
+                <input type="email" id="reg-email" placeholder="Email Address" class="input-field">
+                <input type="tel" id="reg-phone" placeholder="Mobile Number (+91...)" class="input-field">
+                <input type="text" id="reg-emp-id" placeholder="Employee ID" class="input-field">
+                <select id="reg-lab" class="input-field">
+                    <option value="" disabled selected>Select Your Lab...</option>
+                    <option value="PVL">PVL Lab</option>
+                    <option value="HET">HET Lab</option>
+                    <option value="Both">Both Labs</option>
+                </select>
+                <input type="password" id="reg-pass" placeholder="Create Password" class="input-field">
+                <input type="password" id="reg-pass-conf" placeholder="Confirm Password" class="input-field">
+                <button id="register-btn" class="btn primary-btn" style="margin-top: 15px; background: #10b981;"><i class="fas fa-user-plus"></i> Register</button>
+                <p class="text-muted" style="margin-top: 20px;">Already have an account? <a href="#" id="show-login" style="color: var(--primary); font-weight:bold;">Login here</a></p>
             </div>
         </div>
     </div>
@@ -47,7 +81,7 @@
             <label class="input-label">Personal Details:</label>
             <input type="text" id="prof-name" placeholder="Full Name (No spaces for Ntfy)" class="input-field">
             <input type="text" id="prof-emp-id" placeholder="Employee ID" class="input-field">
-            <input type="email" id="prof-email" placeholder="Gmail Address" class="input-field">
+            <input type="email" id="prof-email" placeholder="Gmail Address" class="input-field" readonly style="opacity: 0.6;" title="Email cannot be changed">
             <input type="tel" id="prof-phone" placeholder="Phone Number (+91...)" class="input-field">
             <select id="prof-lab" class="input-field">
                 <option value="PVL">PVL Lab</option>
@@ -64,16 +98,10 @@
             <label class="input-label" style="margin-top: 15px;"><i class="fas fa-image"></i> App Background:</label>
             <div class="theme-grid">
                 <div class="theme-option selected" data-theme="none" style="background: #121212;">Dark</div>
-                <div class="theme-option" data-theme="Bg_img/Bg1.jpg" style="background: url('Bg_img/Bg1.jpg') center/cover;"></div>
-                <div class="theme-option" data-theme="Bg_img/Bg2.jpg" style="background: url('Bg_img/Bg2.jpg') center/cover;"></div>
-                <div class="theme-option" data-theme="Bg_img/bg3.jpg" style="background: url('Bg_img/bg3.jpg') center/cover;"></div>
-                <div class="theme-option" data-theme="Bg_img/bg4.jpg" style="background: url('Bg_img/bg4.jpg') center/cover;"></div>
-                <div class="theme-option" data-theme="Bg_img/bg5.jpg" style="background: url('Bg_img/bg5.jpg') center/cover;"></div>
-                <div class="theme-option" data-theme="Bg_img/bg6.jpg" style="background: url('Bg_img/bg6.jpg') center/cover;"></div>
-                <div class="theme-option" data-theme="Bg_img/bg7.jpg" style="background: url('Bg_img/bg7.jpg') center/cover;"></div>
-                <div class="theme-option" data-theme="Bg_img/bg8.jpg" style="background: url('Bg_img/bg8.jpg') center/cover;"></div>
-                <div class="theme-option" data-theme="Bg_img/bg9.jpg" style="background: url('Bg_img/bg9.jpg') center/cover;"></div>
-                
+                <div class="theme-option" data-theme="Bg%20img/bg3.jpg" style="background: url('Bg%20img/bg3.jpg') center/cover;"></div>
+                <div class="theme-option" data-theme="Bg%20img/bg4.jpg" style="background: url('Bg%20img/bg4.jpg') center/cover;"></div>
+                <div class="theme-option" data-theme="Bg%20img/bg5.jpg" style="background: url('Bg%20img/bg5.jpg') center/cover;"></div>
+                <div class="theme-option" data-theme="Bg%20img/Picsart_26-04-06_00-12-53-578.jpg" style="background: url('Bg%20img/Picsart_26-04-06_00-12-53-578.jpg') center/cover;"></div>
             </div>
             <input type="hidden" id="prof-bg-theme" value="none">
             
@@ -232,7 +260,7 @@
             <textarea id="priv-task-details" placeholder="Details" class="input-field" rows="2"></textarea>
             <div style="display:flex; gap:10px;"><input type="date" id="priv-task-date" class="input-field"><input type="time" id="priv-task-time" class="input-field"></div>
             <label class="input-label">Status:</label>
-
+            <select id="priv-task-status" class="input-field"><option value="Upcoming">Upcoming</option><option value="Pending">Pending</option><option value="Ongoing">Ongoing</option></select>
             <div class="modal-actions"><button id="close-priv-modal-btn" class="btn secondary-btn">Cancel</button><button id="submit-priv-task-btn" class="btn primary-btn" style="background: #8b5cf6;">Save Private</button></div>
         </div>
     </div>
